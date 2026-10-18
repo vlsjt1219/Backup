@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MAFIAZ - Main</title>
+
+    <!-- Supabase SDK & FontAwesome -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- CSS 파일 연동 -->
+    <link rel="stylesheet" href="./editor.css">
+    <link rel="stylesheet" href="./site.css">
+
+    <!-- 웹폰트 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=Zen+Antique&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* 우측 상단 관리자 진입 버튼 */
+        #adminEntryBtn {
+            position: fixed; top: 20px; right: 20px; z-index: 99999;
+            background: rgba(20, 16, 30, 0.85); border: 1px solid #c9a86a; color: #ece5d3;
+            padding: 8px 16px; border-radius: 20px; font-family: 'Nanum Myeongjo', serif;
+            font-size: 0.85em; font-weight: bold; cursor: pointer; backdrop-filter: blur(4px);
+            transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        #adminEntryBtn:hover { background: #c9a86a; color: #111; }
+
+        /* 로그인 모달 팝업 레이어 */
+        #loginOverlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000000;
+            backdrop-filter: blur(5px); align-items: center; justify-content: center;
+            font-family: 'Nanum Myeongjo', serif; color: #ece5d3;
+        }
+        #loginOverlay form {
+            background: #14101e; border: 1px solid #c9a86a; border-radius: 8px;
+            padding: 24px; width: 300px; display: flex; flex-direction: column; gap: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.7); position: relative;
+        }
+        #loginOverlay input {
+            background: #111; border: 1px solid #444; color: #ece5d3;
+            padding: 10px; border-radius: 4px; font-size: 0.95em; outline: none;
+        }
+        #loginOverlay button[type="submit"] {
+            background: #c9a86a; border: none; color: #111; font-weight: bold;
+            padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.95em;
+        }
+        .close-login-btn {
+            position: absolute; top: 12px; right: 15px; background: none; border: none;
+            color: #888; font-size: 1.2em; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 우측 상단 관리자 연결 버튼 -->
+<button type="button" id="adminEntryBtn" onclick="openLoginOverlay()"><i class="fa fa-cog"></i> 관리자</button>
+
+<!-- 관리자 로그인 창 -->
+<div id="loginOverlay">
+  <form id="loginForm">
+    <button type="button" class="close-login-btn" onclick="closeLoginOverlay()">✕</button>
+    <div style="font-weight:bold; color:#c9a86a; font-size:1.1em; text-align:center; margin-bottom:5px;">MAFIAZ 관리자 로그인</div>
+    <input type="text" id="loginEmail" placeholder="아이디" autocomplete="username" required>
+    <input type="password" id="loginPw" placeholder="비밀번호" autocomplete="current-password" required>
+    <button type="submit">로그인</button>
+    <div id="loginMsg" style="color:#ff4757; font-size:0.85em; text-align:center; min-height:1em;"></div>
+  </form>
+</div>
+
+<!-- 페이지 뒷배경 -->
+<div id="pageBg"></div>
+
+<!-- 왼쪽 네비게이션 -->
+<nav id="siteNav">
+    <a href="./index.html" class="is-active">Home</a>
+    <a href="./Character/index.html">Character</a>
+    <a href="./Gallery/index.html">Gallery</a>
+</nav>
+
+<!-- 화면 스테이지 영역 -->
+<div id="stageArea">
+  <div id="stageFrame">
+    <div id="mh-gpfto" class="mh">
+      <div class="mh-bg"></div>
+      <div class="mh-fx"></div>
+      <div class="mh-in">
+        <div class="mh-win">
+          <div class="mh-bar">
+            <span class="mh-ttl">MAFIAZ</span>
+            <span class="mh-btns" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+
+          <!-- 가이드라인 (관리자 모드 전용) -->
+          <div id="centerSnapLineV" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="centerSnapLineH" style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineV" style="position: absolute; top: 0; bottom: 0; width: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineH" style="position: absolute; left: 0; right: 0; height: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="selectionMarquee" style="position: absolute; border: 1px dashed #c9a86a; background: rgba(201,168,106,0.15); z-index: 99998; display: none; pointer-events: none;"></div>
+
+          <div class="mh-body mh-free" id="draggableGallery" style="position: relative; width: 100%; height: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 상세 편집 모달 (관리자 전용) -->
+<div id="imageEditModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; justify-content:center; align-items:center; font-family:'Nanum Myeongjo',serif;">
+  <div style="background:#14101e; border:1px solid #c9a86a; padding:20px; border-radius:8px; width:440px; color:#ece5d3; box-shadow:0 15px 35px rgba(0,0,0,0.7); display:flex; flex-direction:column; align-items:center;">
+    <div style="width:100%; font-weight:bold; color:#c9a86a; margin-bottom:12px; font-size:1.05em; border-bottom:1px solid rgba(201,168,106,0.3); padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+      <span>🖼️ 이미지 구도 및 자르기 편집</span>
+      <button type="button" id="closeImgModal" style="background:none; border:none; color:#ff4757; font-weight:bold; cursor:pointer; font-size:1.1em;">✕</button>
+    </div>
+
+    <div style="display:flex; gap:6px; width:100%; margin-bottom:12px;">
+      <button type="button" id="editTabA" style="flex:1; background:#c9a86a; color:#111; border:none; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 A 편집</button>
+      <button type="button" id="editTabB" style="flex:1; background:#1f1f2a; color:#ece5d3; border:1px solid #c9a86a; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 B 편집</button>
+    </div>
+
+    <div id="cropPreviewContainer" style="position:relative; width:100%; height:260px; background:rgba(0,0,0,0.9); border:2px solid #c9a86a; border-radius:4px; overflow:hidden; display:flex; justify-content:center; align-items:center; margin-bottom:15px; cursor:grab; user-select:none;">
+      <div id="cropInnerBox" style="position:relative; width:100%; height:100%; overflow:hidden; display:flex; justify-content:center; align-items:center;">
+        <img id="modalTargetImg" src="" alt="편집 이미지" style="position:absolute; width:100%; height:100%; object-fit:cover; transform-origin:center center; pointer-events:none; cursor:grab;">
+      </div>
+    </div>
+
+    <div style="width:100%; margin-bottom:15px;">
+      <label style="font-size:0.85em; color:#9d947e; display:block; margin-bottom:4px;">확대/축소 (Zoom)</label>
+      <input type="range" id="modalImgScale" min="0.8" max="6" step="0.1" value="1" style="width:100%; accent-color:#c9a86a;">
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:6px; width:100%;">
+      <button type="button" id="applyImgModal" style="background:#2ed573; border:none; color:#111; font-weight:bold; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:0.9em;">적용 완료</button>
+    </div>
+  </div>
+</div>
+
+<!-- 우측 상단 관리자 컨트롤 패널 -->
+<div id="layoutControlPanel" style="display:none; position: fixed; top: 20px; right: 20px; background: rgba(20,16,30,0.95); color: #ece5d3; padding: 15px; border-radius: 8px; border: 1px solid #c9a86a; z-index: 100000; font-family: 'Nanum Myeongjo', serif; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 300px; max-height: 85vh; overflow-y: auto; box-sizing: border-box;">
+  <div style="font-weight: bold; margin-bottom: 10px; font-size: 0.95em; border-bottom: 1px solid rgba(201,168,106,0.3); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; color: #c9a86a;">
+    <span style="font-size:0.9em;">🛠️ 관리자 패널</span>
+    <div style="display:flex; gap:4px;">
+      <button type="button" id="saveLayoutBtn" style="white-space: nowrap; background: #2ed573; border: none; color: #111; font-size: 0.75em; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold;">저장</button>
+      <button type="button" id="resetLayoutBtn" style="white-space: nowrap; background: #ff4757; border: none; color: #fff; font-size: 0.75em; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold;">초기화</button>
+      <button type="button" id="logoutBtn" style="white-space: nowrap; background: #1f1f2a; border: 1px solid #c9a86a; color: #ece5d3; font-size: 0.75em; padding: 3px 8px; border-radius: 4px; cursor: pointer;">로그아웃</button>
+    </div>
+  </div>
+
+  <div style="margin-bottom: 10px; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; background: rgba(201,168,106,0.08); padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(201,168,106,0.2);">
+    <span>중앙선 및 요소 스냅</span>
+    <input type="checkbox" id="snapToggle" checked style="cursor: pointer; accent-color: #c9a86a;">
+  </div>
+
+  <details style="margin-bottom: 10px; font-size: 0.85em; background: rgba(201,168,106,0.08); padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(201,168,106,0.2);">
+    <summary style="cursor: pointer; color: #c9a86a; font-weight: bold;">🖼️ 페이지 배경 설정</summary>
+    <div style="margin-top: 8px;">
+      <label style="display:block; font-size:0.85em; color:#9d947e; margin-bottom:2px;">배경 이미지 경로</label>
+      <input type="text" id="bgImageInput" placeholder="https://..." style="width:100%; box-sizing:border-box; background:#111; border:1px solid #444; color:#ece5d3; padding:5px; border-radius:3px; font-size:0.9em;">
+
+      <label style="display:flex; justify-content:space-between; font-size:0.85em; color:#9d947e; margin-top:8px; margin-bottom:2px;"><span>배경 어둡기</span><span id="bgDimVal">0.45</span></label>
+      <input type="range" id="bgDimRange" min="0" max="0.9" step="0.05" value="0.45" style="width:100%; accent-color:#c9a86a; margin-bottom:8px;">
+
+      <label style="display:flex; justify-content:space-between; font-size:0.85em; color:#9d947e; margin-bottom:2px;"><span>메인 창 불투명도</span><span id="winAlphaVal">0.88</span></label>
+      <input type="range" id="winAlphaRange" min="0" max="1" step="0.02" value="0.88" style="width:100%; accent-color:#c9a86a; margin-bottom:8px;">
+
+      <button type="button" id="bgClearBtn" style="background:#1f1f2a; border:1px solid #c9a86a; color:#ece5d3; font-size:0.78em; padding:4px 8px; border-radius:4px; cursor:pointer;">배경 이미지 지우기</button>
+    </div>
+  </details>
+
+  <div style="margin-bottom: 12px; display: flex; gap: 4px;">
+    <button type="button" id="addTextBtn" style="flex:1; background: #1f1f2a; border: 1px solid #c9a86a; color: #ece5d3; font-size: 0.78em; padding: 6px 2px; border-radius: 4px; cursor: pointer;">+ 글</button>
+    <button type="button" id="addCalendarBtn" style="flex:1; background: #1f1f2a; border: 1px solid #c9a86a; color: #ece5d3; font-size: 0.78em; padding: 6px 2px; border-radius: 4px; cursor: pointer;">+ 달력</button>
+    <button type="button" id="addImageBtn" style="flex:1; background: #1f1f2a; border: 1px solid #c9a86a; color: #ece5d3; font-size: 0.78em; padding: 6px 2px; border-radius: 4px; cursor: pointer;">+ 이미지</button>
+  </div>
+</div>
+
+<script src="./editor.js"></script>
+<script>
+(function () {
+    const ADMIN_ID = 'admin';
+    const ADMIN_PW = '1111';
+    const KEY = 'mafiaz_admin_login';
+
+    const entryBtn = document.getElementById('adminEntryBtn');
+    const overlay = document.getElementById('loginOverlay');
+    const panel = document.getElementById('layoutControlPanel');
+    const msg = document.getElementById('loginMsg');
+
+    // 일반 방문자 모드로 초기화 시작
+    let isAdmin = false;
+    try {
+        if (localStorage.getItem(KEY) === '1') {
+            isAdmin = true;
+        }
+    } catch(e) {}
+
+    if (isAdmin) {
+        entryBtn.style.display = 'none';
+        panel.style.display = 'block';
+        startEditor(true); // 에디터(수정) 모드 열기
+    } else {
+        startEditor(false); // 읽기 전용 보기 모드 실행
+    }
+
+    // 로그인 창 열기 / 닫기
+    window.openLoginOverlay = function() { overlay.style.display = 'flex'; };
+    window.closeLoginOverlay = function() { overlay.style.display = 'none'; msg.textContent = ''; };
+
+    // 관리자 로그인 처리
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('loginEmail').value.trim();
+        const pw = document.getElementById('loginPw').value;
+
+        if (id === ADMIN_ID && pw === ADMIN_PW) {
+            try { localStorage.setItem(KEY, '1'); } catch (err) { }
+            location.reload(); // 관리자 권한 적용을 위해 즉시 새로고침
+        } else {
+            msg.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
+        }
+    });
+
+    // 로그아웃 처리
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        try { localStorage.removeItem(KEY); } catch (err) { }
+        location.reload();
+    });
+})();
+</script>
+
+</body>
+</html>
