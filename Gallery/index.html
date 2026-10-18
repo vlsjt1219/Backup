@@ -1059,7 +1059,8 @@ async function submitPostToGithub() {
     const cate = document.getElementById('ca_name').value;
     const title = document.getElementById('wr_subject').value.trim() || 'Untitled';
     const content = document.getElementById('wr_content').value.trim();
-    const newFileName = `[${cate}]${title}_${content}.webp`;
+    const cleanContentForFileName = content.replace(/#/g, '');
+    const newFileName = `[${cate}]${title}_${cleanContentForFileName}.webp`;
 
     if (isEditMode && currentEditingItem) {
         const latestSha = await fetchLatestSha(currentEditingItem.fileName);
