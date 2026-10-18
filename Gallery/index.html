@@ -524,21 +524,36 @@ async function saveDesignSettings() {
     };
 
     try {
-        // 1. 디자인 데이터 저장
-        await sbClient.from('layouts').upsert({ id: 'gallery_design_config', layout_data: config });
+        // 1. 디자인 데이터 저장 (page_name 추가)
+        const { error: err1 } = await sbClient.from('layouts').upsert({ 
+            id: 'gallery_design_config', 
+            page_name: 'gallery', 
+            layout_data: config 
+        });
+        if (err1) throw err1;
 
-        // 2. 카드 파일명 순서 배열 추출 및 Supabase 저장
+        // 2. 카드 파일명 순서 배열 추출 및 Supabase 저장 (page_name 추가)
         const currentCardOrder = galleryItems.map(item => item.fileName);
-        await sbClient.from('layouts').upsert({ id: 'gallery_item_order', layout_data: currentCardOrder });
+        const { error: err2 } = await sbClient.from('layouts').upsert({ 
+            id: 'gallery_item_order', 
+            page_name: 'gallery', 
+            layout_data: currentCardOrder 
+        });
+        if (err2) throw err2;
 
-        // 3. 태그 순서 저장
-        await sbClient.from('layouts').upsert({ id: 'gallery_tag_order', layout_data: tagList });
+        // 3. 태그 순서 저장 (page_name 추가)
+        const { error: err3 } = await sbClient.from('layouts').upsert({ 
+            id: 'gallery_tag_order', 
+            page_name: 'gallery', 
+            layout_data: tagList 
+        });
+        if (err3) throw err3;
 
         applyDesignStyles(config);
         alert('디자인 및 순서 설정이 저장되었습니다!');
     } catch (err) {
         console.error('Save Error:', err);
-        alert('저장 중 오류가 발생했습니다.');
+        alert('저장 실패: ' + (err.message || JSON.stringify(err)));
     }
 }
 
