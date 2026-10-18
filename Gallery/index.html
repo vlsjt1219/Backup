@@ -209,7 +209,6 @@
 
         .polaroid-title-text { font-size: 22px; font-weight: bold; color: #222; margin-bottom: 8px; display: block; }
         
-        /* 모달 안 태그 배지 */
         .polaroid-tag-badge {
             display: inline-block; background: #f1c40f; color: #ffffff; font-size: 12px;
             font-weight: bold; padding: 4px 12px; border-radius: 12px; margin-right: 6px; margin-bottom: 12px;
@@ -524,18 +523,23 @@ async function saveDesignSettings() {
         page_hover_text_col: document.getElementById('p_page_hover_text_col').value
     };
 
-    // 1. 디자인 데이터 저장
-    await sbClient.from('layouts').upsert({ id: 'gallery_design_config', layout_data: config });
+    try {
+        // 1. 디자인 데이터 저장
+        await sbClient.from('layouts').upsert({ id: 'gallery_design_config', layout_data: config });
 
-    // 2. 카드 순서(파일명 순서) 저장
-    const currentCardOrder = galleryItems.map(item => item.fileName);
-    await sbClient.from('layouts').upsert({ id: 'gallery_item_order', layout_data: currentCardOrder });
+        // 2. 카드 파일명 순서 배열 추출 및 Supabase 저장
+        const currentCardOrder = galleryItems.map(item => item.fileName);
+        await sbClient.from('layouts').upsert({ id: 'gallery_item_order', layout_data: currentCardOrder });
 
-    // 3. 태그 순서 저장
-    await sbClient.from('layouts').upsert({ id: 'gallery_tag_order', layout_data: tagList });
+        // 3. 태그 순서 저장
+        await sbClient.from('layouts').upsert({ id: 'gallery_tag_order', layout_data: tagList });
 
-    applyDesignStyles(config);
-    alert('디자인 및 순서 설정이 데이터베이스에 저장되었습니다!');
+        applyDesignStyles(config);
+        alert('디자인 및 순서 설정이 저장되었습니다!');
+    } catch (err) {
+        console.error('Save Error:', err);
+        alert('저장 중 오류가 발생했습니다.');
+    }
 }
 
 async function loadDesignSettings() {
@@ -650,25 +654,26 @@ async function loadGalleryData() {
             };
         });
 
-        // 1. 데이터베이스에서 카드 순서 로드 후 적용
+        // 1. Supabase에서 카드 저장 순서 로드
         const { data: orderData } = await sbClient.from('layouts').select('layout_data').eq('id', 'gallery_item_order').maybeSingle();
         if (orderData && orderData.layout_data) {
             let savedOrder = orderData.layout_data;
             if (typeof savedOrder === 'string') { try { savedOrder = JSON.parse(savedOrder); } catch(e){} }
 
-            if (Array.isArray(savedOrder)) {
+            if (Array.isArray(savedOrder) && savedOrder.length > 0) {
+                const orderMap = new Map();
+                savedOrder.forEach((fn, idx) => orderMap.set(fn, idx));
+
                 fetchedItems.sort((a, b) => {
-                    let indexA = savedOrder.indexOf(a.fileName);
-                    let indexB = savedOrder.indexOf(b.fileName);
-                    if (indexA === -1) indexA = 9999;
-                    if (indexB === -1) indexB = 9999;
+                    const indexA = orderMap.has(a.fileName) ? orderMap.get(a.fileName) : 999999;
+                    const indexB = orderMap.has(b.fileName) ? orderMap.get(b.fileName) : 999999;
                     return indexA - indexB;
                 });
             }
         }
         galleryItems = fetchedItems;
 
-        // 2. 데이터베이스에서 태그 순서 로드 후 적용
+        // 2. Supabase에서 태그 저장 순서 로드
         const tagSet = new Set();
         galleryItems.forEach(item => item.tags.forEach(t => tagSet.add(t)));
         let fetchedTags = Array.from(tagSet);
@@ -678,12 +683,13 @@ async function loadGalleryData() {
             let savedTagOrder = tagOrderData.layout_data;
             if (typeof savedTagOrder === 'string') { try { savedTagOrder = JSON.parse(savedTagOrder); } catch(e){} }
 
-            if (Array.isArray(savedTagOrder)) {
+            if (Array.isArray(savedTagOrder) && savedTagOrder.length > 0) {
+                const tagMap = new Map();
+                savedTagOrder.forEach((tg, idx) => tagMap.set(tg, idx));
+
                 fetchedTags.sort((a, b) => {
-                    let indexA = savedTagOrder.indexOf(a);
-                    let indexB = savedTagOrder.indexOf(b);
-                    if (indexA === -1) indexA = 9999;
-                    if (indexB === -1) indexB = 9999;
+                    const indexA = tagMap.has(a) ? tagMap.get(a) : 999999;
+                    const indexB = tagMap.has(b) ? tagMap.get(b) : 999999;
                     return indexA - indexB;
                 });
             }
@@ -784,6 +790,7 @@ function renderGalleryGrid() {
         const card = document.createElement('div');
         card.className = 'card-item';
         card.dataset.index = realIndex;
+        card.dataset.filename = item.fileName; // 고유 파일명 지정
 
         card.innerHTML = `
             <div class="card-thumb">
@@ -900,20 +907,25 @@ function setupCustomDrag(element, type) {
                     placeholder.remove();
 
                     if (type === 'card') {
-                        const newOrderIndices = Array.from(container.querySelectorAll('.card-item')).map(el => parseInt(el.dataset.index));
-                        const newFiltered = newOrderIndices.map(i => filteredItems[i]);
+                        // DOM 요소에 배치된 파일명 수집 후 galleryItems/filteredItems 배열 동기화
+                        const newDomFilenames = Array.from(container.querySelectorAll('.card-item')).map(el => el.dataset.filename);
                         
-                        // 전체 galleryItems에도 바뀐 순서 즉시 반영
-                        const updatedGallery = [...galleryItems];
-                        let filterIdx = 0;
-                        galleryItems.forEach((item, idx) => {
-                            if (filteredItems.includes(item)) {
-                                updatedGallery[idx] = newFiltered[filterIdx++];
-                            }
+                        const newFiltered = [];
+                        newDomFilenames.forEach(fn => {
+                            const found = filteredItems.find(item => item.fileName === fn);
+                            if (found) newFiltered.push(found);
                         });
-                        galleryItems = updatedGallery;
-                        filteredItems = newFiltered;
 
+                        // 메인 galleryItems 배열 순서 업데이트
+                        let filterIdx = 0;
+                        galleryItems = galleryItems.map(item => {
+                            if (filteredItems.includes(item)) {
+                                return newFiltered[filterIdx++];
+                            }
+                            return item;
+                        });
+
+                        filteredItems = newFiltered;
                         renderGalleryGrid();
                     } else {
                         const newTags = Array.from(container.querySelectorAll('.tag-btn[data-tag-index]')).map(el => tagList[parseInt(el.dataset.tagIndex)]);
