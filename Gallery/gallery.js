@@ -181,6 +181,8 @@ function ghFailAlert(what) {
     if (lastGhStatus === 401) {
         localStorage.removeItem(GH_TOKEN_KEY);
         alert('토큰이 올바르지 않아 저장된 토큰을 지웠습니다.\n「🔑 토큰 재입력」 버튼을 누르거나, 다시 시도하면 입력창이 뜹니다.');
+    } else if (lastGhStatus === 409 || lastGhStatus === 422) {
+        alert(what + ' 도중 GitHub 쪽 변경과 겹쳐 중단되었습니다. 이미 올라간 것은 그대로이니, 버튼을 다시 누르면 없는 것만 이어서 만듭니다.');
     } else if (lastGhStatus === 403 || lastGhStatus === 404) {
         alert(what + '에 실패했습니다.\n토큰에 이 저장소의 Contents(읽기/쓰기) 권한이 있는지 확인해주세요.\n토큰을 바꾸려면 「🔑 토큰 재입력」 버튼을 누르세요.');
     } else {
@@ -1262,7 +1264,9 @@ async function generateMissingThumbs() {
     const H = { 'Authorization': `token ${token.trim()}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
     const api = p => `https://api.github.com/repos/${GITHUB_REPO}${p}`;
     const call = async (method, p, body) => {
-        const r = await fetch(api(p), { method, headers: H, body: body ? JSON.stringify(body) : undefined });
+        // GET 은 브라우저/GitHub 캐시(최대 60초)가 옛 값을 주지 않도록 항상 새로 요청
+        const url = api(p + (method === 'GET' ? (p.includes('?') ? '&' : '?') + 't=' + Date.now() : ''));
+        const r = await fetch(url, { method, headers: H, cache: 'no-store', body: body ? JSON.stringify(body) : undefined });
         lastGhStatus = r.status;
         if (!r.ok) throw new Error(method + ' ' + p + ' → ' + r.status);
         return r.json();
@@ -1294,6 +1298,7 @@ async function generateMissingThumbs() {
 
         const BATCH = 40;
         let made = 0, failed = 0;
+        let headSha = null, headTree = null;
         for (let i = 0; i < missing.length; i += BATCH) {
             const part = missing.slice(i, i + BATCH);
             const entries = [];
@@ -1313,13 +1318,26 @@ async function generateMissingThumbs() {
                 setLabel(`썸네일 ${Math.min(i + k + 4, missing.length)}/${missing.length}`);
             }
             if (!entries.length) continue;
-            const ref = await call('GET', '/git/ref/heads/main');
-            const parentSha = ref.object.sha;
-            const parent = await call('GET', '/git/commits/' + parentSha);
-            const tree = await call('POST', '/git/trees', { base_tree: parent.tree.sha, tree: entries });
-            const commit = await call('POST', '/git/commits', { message: `Add thumbnails (${entries.length})`, tree: tree.sha, parents: [parentSha] });
-            await call('PATCH', '/git/refs/heads/main', { sha: commit.sha });
-            made += entries.length;
+            // 커밋 1번으로 묶어 올림. 직전 배치에서 만든 커밋을 이어받아 쓰고, 어긋나면(422) 최신 상태를 다시 읽어 한 번 재시도
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    if (!headSha) {
+                        const ref = await call('GET', '/git/ref/heads/main');
+                        headSha = ref.object.sha;
+                        const parent = await call('GET', '/git/commits/' + headSha);
+                        headTree = parent.tree.sha;
+                    }
+                    const tree = await call('POST', '/git/trees', { base_tree: headTree, tree: entries });
+                    const commit = await call('POST', '/git/commits', { message: `Add thumbnails (${entries.length})`, tree: tree.sha, parents: [headSha] });
+                    await call('PATCH', '/git/refs/heads/main', { sha: commit.sha });
+                    headSha = commit.sha; headTree = tree.sha;
+                    made += entries.length;
+                    break;
+                } catch (e) {
+                    if (lastGhStatus === 422 && attempt === 0) { headSha = null; continue; }
+                    throw e;
+                }
+            }
         }
         alert(`썸네일 ${made}개를 올렸습니다.${failed ? `\n(${failed}개는 만들지 못했습니다)` : ''}\nGitHub Pages 반영까지 1~2분 걸릴 수 있습니다.`);
     } catch (e) {
