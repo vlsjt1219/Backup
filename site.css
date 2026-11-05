@@ -1,0 +1,213 @@
+@charset "utf-8";
+/* =====================================================================
+   MAFIAZ 공통 레이아웃: 왼쪽 네비게이션 / 배경 / 화면 배율 / 관리자 편집 보조
+   (메인·Character·Gallery 모두 사용)
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap');
+
+/* =====================================================================
+   테마 색상 (다크 = 기본 / 라이트 = <html data-theme="light">)
+   - 모든 페이지가 이 변수를 사용합니다. 색을 바꾸려면 여기만 고치면 됩니다.
+   ===================================================================== */
+:root {
+  --acc: #c9a86a;            /* 포인트 색 (다크: 금색) */
+  --acc-rgb: 201, 168, 106;
+  --ink: #ece5d3;            /* 글자색 */
+  --sub: #9d947e;            /* 보조 글자색 */
+  --win-rgb: 13, 16, 30;     /* 창 배경 (다크: 남색) */
+  --line: rgba(var(--acc-rgb), .35);
+  --line-soft: rgba(var(--acc-rgb), .18);
+  --card: rgba(var(--acc-rgb), .05);
+  --nav-bg: #000;
+  --body-bg: #111;
+  --page-base: #0b0d14;      /* 배경 이미지가 없을 때 바탕색 */
+  --page-overlay-rgb: 0, 0, 0;
+  --field-bg: #111;
+  --field-line: #444;
+  --on-acc: #111;            /* 포인트 색 위의 글자색 */
+  --danger: #ff4757;
+  --yel: #f1c40f;            /* 갤러리 노란 포인트 */
+  --yel-rgb: 241, 196, 15;
+}
+:root[data-theme="light"] {
+  --acc: #0f4aa1;            /* 포인트 색 (라이트: 하늘색) */
+  --acc-rgb: 15, 74, 161;
+  --ink: #1f2433;
+  --sub: #6a7080;
+  --win-rgb: 238, 241, 245;  /* 창 배경 (라이트: #e2e1df) */
+  --nav-bg: #f2f2f2;
+  --body-bg: #e6e6e6;
+  --page-base: #d3d3d0;
+  --page-overlay-rgb: 200, 200, 200;
+  --field-bg: #e2e1df;
+  --field-line: #c3c7cf;
+  --on-acc: #e2e1df;
+  --yel: #0f4aa1;
+  --yel-rgb: 2, 178, 204;
+}
+
+
+/* 가로 영역을 화면에 꽉 차게 넓히고 아래로 내림 */
+#mh-gpfto{--bg:;--win-a:.88;--win:rgba(var(--win-rgb),var(--win-a));--box:rgba(var(--acc-rgb),.05);position:relative;display:flex;flex-direction:column;box-sizing:border-box;width:1500px;max-width:none;height:900px;margin:-30px 0 0 -80px;overflow:hidden;font-family:'Nanum Myeongjo',serif;color:var(--ink)}
+#mh-gpfto .mh-in{position:relative;flex:1;display:flex;flex-direction:column;padding:20px; width:100%; box-sizing:border-box;} 
+#mh-gpfto .mh-win{position:relative;flex:1;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:0;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+#mh-gpfto .mh-win::before{content:'';position:absolute;inset:6px;border:1px solid var(--line);border-radius:0;pointer-events:none}
+#mh-gpfto .mh-bar{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  padding:20px;
+  font-family:'Cormorant Garamond',serif;
+  font-size:2em;
+  letter-spacing:.16em;
+  color:var(--acc);
+  position:relative;
+  border-bottom: none;
+  /* 불규칙하게 끊어지는 선 패턴 */
+  background-image: repeating-linear-gradient(90deg,
+    rgba(var(--acc-rgb), 0.4) 0px, rgba(var(--acc-rgb), 0.4) 35px, 
+    transparent 35px, transparent 45px, 
+    rgba(var(--acc-rgb), 0.4) 45px, rgba(var(--acc-rgb), 0.4) 55px, 
+    transparent 55px, transparent 65px, 
+    rgba(var(--acc-rgb), 0.4) 65px, rgba(var(--acc-rgb), 0.4) 200px, 
+    transparent 200px, transparent 200px,
+    rgba(var(--acc-rgb), 0.4) 200px, rgba(var(--acc-rgb), 0.4) 400px, 
+    transparent 400px, transparent 410px
+  );
+  background-size: 430px 1px;
+  background-position: bottom;
+  background-repeat: repeat-x;
+}
+#mh-gpfto .mh-bar::before,#mh-gpfto .mh-bar::after{content:'✦';font-size:.5em;opacity:.7}
+#mh-gpfto { overflow: visible !important; } /* 메인 틀 전체의 자르기 방지 */
+#mh-gpfto .mh-win { overflow: visible !important; } /* 창 테두리 바깥 영역 허용 */
+#mh-gpfto .mh-body{
+  position: absolute; /* 절대 좌표로 변경하여 보드 전체를 자유롭게 활성화 */
+  inset: 0;
+  overflow: visible !important; 
+  padding: 60px 20px 20px 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+:root { --nav-w: 180px; }
+
+html, body { margin: 0; min-height: 100%; background: var(--body-bg); }
+
+/* ── 페이지 배경 (관리자 패널에서 이미지/어둡기 설정) ── */
+#pageBg {
+  position: fixed; inset: 0; z-index: 0;
+  background: var(--page-base) center / cover no-repeat;
+}
+#pageBg::after {
+  content: ""; position: absolute; inset: 0;
+  background: rgba(var(--page-overlay-rgb), var(--bg-dim, 0.45));
+  pointer-events: none;
+}
+
+/* ── 스테이지: 1500x900 디자인 영역을 화면 크기에 맞춰 통째로 확대/축소 ── */
+#stageArea {
+  position: relative; z-index: 1;
+  margin-left: var(--nav-w);
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; box-sizing: border-box;
+}
+#stageFrame { position: relative; flex: none; }
+#stageFrame #mh-gpfto.mh {
+  position: absolute; left: 0; top: 0;
+  margin: 0;
+  transform-origin: 0 0;
+}
+
+/* ── 왼쪽 네비게이션 ── */
+#siteNav {
+  position: fixed; left: 0; top: 0; bottom: 0;
+  width: var(--nav-w);
+  background: var(--nav-bg);
+  display: flex; flex-direction: column; justify-content: center; gap: 22px;
+  z-index: 5000; box-sizing: border-box;
+  border-right: 1px solid var(--line-soft);
+}
+#siteNav a {
+  position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 0;
+  color: var(--ink); text-decoration: none;
+  font-family: 'Cormorant Garamond', 'Nanum Myeongjo', serif;
+  font-size: 1.2em; font-weight: 600; letter-spacing: 0.06em;
+  transition: color 0.3s ease, letter-spacing 0.4s cubic-bezier(.3, 1.4, .5, 1), text-shadow 0.3s ease;
+}
+/* 글자 양옆의 "-" 가 마우스를 올리면 길어지며 빛남 */
+#siteNav a::before, #siteNav a::after {
+  content: ""; display: block;
+  width: 8px; height: 1px; background: currentColor; opacity: 0.7;
+  transition: width 0.4s cubic-bezier(.3, 1.4, .5, 1), opacity 0.3s ease;
+}
+#siteNav a:hover {
+  color: var(--acc); letter-spacing: 0.13em;
+  text-shadow: 0 0 14px rgba(var(--acc-rgb), 0.55);
+}
+#siteNav a:hover::before, #siteNav a:hover::after { width: 20px; opacity: 1; }
+#siteNav a.is-active { color: var(--acc); }
+#siteNav a.is-active::before, #siteNav a.is-active::after { width: 14px; opacity: 1; }
+
+/* 좁은 화면(모바일): 네비게이션을 위쪽 가로 바로 */
+@media (max-width: 760px) {
+  :root { --nav-w: 0px; }
+  #siteNav {
+    right: 0; bottom: auto; width: 100%;
+    flex-direction: row; justify-content: center; gap: 12px;
+    border-right: none; border-bottom: 1px solid var(--line-soft);
+  }
+  #siteNav a { padding: 12px 6px; font-size: 1em; }
+  #stageArea { margin-left: 0; padding-top: 52px; align-items: flex-start; }
+}
+
+/* ── 라이트/다크 전환 버튼 (common.js 가 왼쪽 메뉴 맨 아래에 넣음) ── */
+#themeToggle {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: transparent; border: 1px solid var(--line); color: var(--ink);
+  padding: 6px 14px; border-radius: 16px; cursor: pointer; white-space: nowrap;
+  font-family: 'Nanum Myeongjo', serif; font-size: .8em;
+  transition: color .25s, border-color .25s, background .25s;
+}
+#themeToggle:hover { color: var(--acc); border-color: var(--acc); }
+@media (max-width: 760px) { #themeToggle { position: static; transform: none; padding: 4px 10px; align-self: center; } }
+
+/* ── 관리자 진입 버튼 / 로그인 창 (common.js 가 만들어 붙임) ── */
+#adminEntryBtn {
+  position: fixed; top: 20px; right: 20px; z-index: 99999;
+  background: rgba(var(--win-rgb), 0.85); border: 1px solid var(--acc); color: var(--ink);
+  padding: 8px 16px; border-radius: 20px; font-family: 'Nanum Myeongjo', serif;
+  font-size: 0.85em; font-weight: bold; cursor: pointer; backdrop-filter: blur(4px);
+  transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+#adminEntryBtn:hover { background: var(--acc); color: var(--on-acc); }
+
+#loginOverlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000000;
+  backdrop-filter: blur(5px); align-items: center; justify-content: center;
+  font-family: 'Nanum Myeongjo', serif; color: var(--ink);
+}
+#loginOverlay form {
+  background: rgb(var(--win-rgb)); border: 1px solid var(--acc); border-radius: 8px;
+  padding: 24px; width: 300px; display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 15px 35px rgba(0,0,0,0.7); position: relative;
+}
+#loginOverlay input {
+  background: var(--field-bg); border: 1px solid var(--field-line); color: var(--ink);
+  padding: 10px; border-radius: 4px; font-size: 0.95em; outline: none;
+}
+#loginOverlay button[type="submit"] {
+  background: var(--acc); border: none; color: var(--on-acc); font-weight: bold;
+  padding: 10px; border-radius: 4px; cursor: pointer; font-size: 0.95em;
+}
+#loginOverlay .close-login-btn {
+  position: absolute; top: 12px; right: 15px; background: none; border: none;
+  color: var(--sub); font-size: 1.2em; cursor: pointer;
+}
+#loginOverlay .login-title { font-weight: bold; color: var(--acc); font-size: 1.1em; text-align: center; margin-bottom: 5px; }
+#loginOverlay #loginMsg { color: var(--danger); font-size: 0.85em; text-align: center; min-height: 1em; }

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>try{if(localStorage.getItem('mafiaz_theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+    <title>MAFIAZ - Main</title>
+
+    <!-- Supabase SDK & FontAwesome -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- CSS 파일 연동 -->
+    <link rel="stylesheet" href="./editor.css">
+    <link rel="stylesheet" href="./site.css">
+
+    <!-- 웹폰트 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=Zen+Antique&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@400;700&family=Gowun+Batang:wght@400;700&family=Black+Han+Sans&display=swap" rel="stylesheet">
+
+</head>
+<body>
+
+<!-- 페이지 뒷배경 -->
+<div id="pageBg"></div>
+
+<!-- 왼쪽 네비게이션 -->
+<nav id="siteNav">
+    <a href="./index.html" class="is-active">Home</a>
+    <a href="./Story/index.html">Story</a>
+    <a href="./Character/index.html">Character</a>
+    <a href="./Gallery/index.html">Gallery</a>
+</nav>
+
+<!-- 화면 스테이지 영역 -->
+<div id="stageArea">
+  <div id="stageFrame">
+    <div id="mh-gpfto" class="mh">
+      <div class="mh-bg"></div>
+      <div class="mh-fx"></div>
+      <div class="mh-in">
+        <div class="mh-win">
+          <div class="mh-bar">
+            <span class="mh-ttl">MAFIAZ</span>
+            <span class="mh-btns" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+
+          <!-- 가이드라인 (관리자 모드 전용) -->
+          <div id="centerSnapLineV" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="centerSnapLineH" style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineV" style="position: absolute; top: 0; bottom: 0; width: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineH" style="position: absolute; left: 0; right: 0; height: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="selectionMarquee" style="position: absolute; border: 1px dashed #c9a86a; background: rgba(201,168,106,0.15); z-index: 99998; display: none; pointer-events: none;"></div>
+
+          <div class="mh-body mh-free" id="draggableGallery" style="position: relative; width: 100%; height: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 이미지 상세 편집 모달 (관리자 전용) -->
+<div id="imageEditModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; justify-content:center; align-items:center; font-family:'Nanum Myeongjo',serif;">
+  <div style="background:#14101e; border:1px solid #c9a86a; padding:20px; border-radius:8px; width:440px; color:#ece5d3; box-shadow:0 15px 35px rgba(0,0,0,0.7); display:flex; flex-direction:column; align-items:center;">
+    <div style="width:100%; font-weight:bold; color:#c9a86a; margin-bottom:12px; font-size:1.05em; border-bottom:1px solid rgba(201,168,106,0.3); padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+      <span>🖼️ 이미지 구도 및 자르기 편집</span>
+      <button type="button" id="closeImgModal" style="background:none; border:none; color:#ff4757; font-weight:bold; cursor:pointer; font-size:1.1em;">✕</button>
+    </div>
+
+    <div style="display:flex; gap:6px; width:100%; margin-bottom:12px;">
+      <button type="button" id="editTabA" style="flex:1; background:#c9a86a; color:#111; border:none; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 A 편집</button>
+      <button type="button" id="editTabB" style="flex:1; background:#1f1f2a; color:#ece5d3; border:1px solid #c9a86a; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 B 편집</button>
+    </div>
+
+    <div id="cropPreviewContainer" style="position:relative; width:100%; height:260px; background:rgba(0,0,0,0.9); border:2px solid #c9a86a; border-radius:4px; overflow:hidden; display:flex; justify-content:center; align-items:center; margin-bottom:15px; cursor:grab; user-select:none;">
+      <div id="cropInnerBox" style="position:relative; width:100%; height:100%; overflow:hidden; display:flex; justify-content:center; align-items:center;">
+        <img id="modalTargetImg" src="" alt="편집 이미지" style="position:absolute; width:100%; height:100%; object-fit:cover; transform-origin:center center; pointer-events:none; cursor:grab;">
+      </div>
+    </div>
+
+    <div style="width:100%; margin-bottom:15px;">
+      <label style="font-size:0.85em; color:#9d947e; display:block; margin-bottom:4px;">확대/축소 (Zoom)</label>
+      <input type="range" id="modalImgScale" min="0.8" max="6" step="0.1" value="1" style="width:100%; accent-color:#c9a86a;">
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:6px; width:100%;">
+      <button type="button" id="applyImgModal" style="background:#2ed573; border:none; color:#111; font-weight:bold; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:0.9em;">적용 완료</button>
+    </div>
+  </div>
+</div>
+
+<script src="./common.js"></script>
+<script src="./editor.js"></script>
+<script>
+    MZ.initLogin({ onLogin: () => location.reload(), onLogout: () => location.reload() });
+    startEditor(MZ.isAdmin(), 'main'); // 👈 메인 페이지 데이터 사용
+</script>
+
+</body>
+</html>

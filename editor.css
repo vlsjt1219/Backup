@@ -1,0 +1,171 @@
+@charset "utf-8";
+/* 메인 페이지 블록 에디터 전용 스타일 (공통 창/네비게이션은 site.css) */
+
+/* 파워포인트 도형 클리핑 스타일 (메인 블록 + 이미지 편집 모달 미리보기 공용) */
+:is(.editable-element, #cropInnerBox).shape-rect { clip-path: none; }
+:is(.editable-element, #cropInnerBox).shape-oval { clip-path: ellipse(50% 50% at 50% 50%); }
+:is(.editable-element, #cropInnerBox).shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+:is(.editable-element, #cropInnerBox).shape-rt-triangle { clip-path: polygon(0% 0%, 0% 100%, 100% 100%); }
+:is(.editable-element, #cropInnerBox).shape-parallelogram { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+:is(.editable-element, #cropInnerBox).shape-trapezoid { clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%); }
+:is(.editable-element, #cropInnerBox).shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+:is(.editable-element, #cropInnerBox).shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+:is(.editable-element, #cropInnerBox).shape-hexagon { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+
+/* 이미지 블록 마우스 오버 전환 스타일
+   (벤토 #214 모션 값 이식: 스프링 곡선 .3,1.5,.5,1 / 칸이 살짝 뜨고 테두리가 밝아지며 / 안쪽 장면이 시차를 두고 움직임)
+   ※ 이미지에는 에디터가 인라인 transform(위치·확대)을 쓰므로,
+      호버 모션은 개별 속성 scale 로 얹어서 서로 덮어쓰지 않게 했습니다. */
+.editable-element img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity 0.35s ease, scale 0.5s cubic-bezier(.3, 1.5, .5, 1);
+}
+.editable-element .main-img {
+  scale: 1;
+}
+.editable-element .hover-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  scale: var(--hv-zoom, 1.08);       /* 처음엔 살짝 크게 */
+}
+.editable-element:hover .hover-img {
+  opacity: 1;
+  scale: 1;                          /* 스프링으로 제 크기에 안착 */
+  transition-delay: 0.06s;           /* 메인 이미지보다 살짝 늦게 등장 */
+}
+.editable-element:hover .main-img {
+  opacity: 0;
+  scale: var(--hv-shrink, .96);      /* 메인은 살짝 물러나며 사라짐 */
+}
+
+/* 블록 공통 */
+.editable-element {
+  position: absolute;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  overflow: hidden;
+  min-width: 40px;
+  min-height: 28px;
+  /* transform 은 회전(인라인)용으로 남기고, 호버로 뜨는 동작은 translate/scale 개별 속성으로 처리 */
+  transition: transform 0.25s ease, translate 0.35s cubic-bezier(.3, 1.4, .5, 1), scale 0.35s cubic-bezier(.3, 1.4, .5, 1), box-shadow 0.3s ease, border-color 0.25s ease;
+
+  /* 기본값 = 강도 2(보통) */
+  --hv-lift: -5px;
+  --hv-grow: 1;
+  --hv-zoom: 1.08;
+  --hv-shrink: .96;
+  --hv-glow: 0 8px 25px rgba(var(--acc-rgb),0.25);
+  --hv-ring: 1;
+}
+
+/* 호버 시 밝아지는 테두리 (이미지가 위를 덮으므로 inset 그림자 대신 덮개 레이어 사용) */
+.editable-element::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--acc, var(--acc)) 55%, transparent);
+  transition: opacity 0.3s ease;
+}
+.editable-element:hover::after { opacity: var(--hv-ring); }
+
+/* 호버: 칸이 살짝 떠오름 (인라인 rotate 와 충돌하지 않도록 translate 사용) */
+.editable-element:hover {
+  translate: 0 var(--hv-lift);
+  scale: var(--hv-grow);
+  box-shadow: var(--hv-glow);
+}
+
+/* 마우스 오버 애니메이션 강도 (관리자 패널의 0~3 설정과 연결) */
+.editable-element[data-anim-intensity="0"] { --hv-lift: 0px;   --hv-grow: 1;    --hv-zoom: 1;    --hv-shrink: 1;   --hv-glow: none; --hv-ring: 0; }
+.editable-element[data-anim-intensity="1"] { --hv-lift: -2px;  --hv-grow: 1;    --hv-zoom: 1.04; --hv-shrink: .98; --hv-glow: 0 4px 12px rgba(var(--acc-rgb),0.15); }
+.editable-element[data-anim-intensity="2"] { --hv-lift: -5px;  --hv-grow: 1;    --hv-zoom: 1.08; --hv-shrink: .96; --hv-glow: 0 8px 25px rgba(var(--acc-rgb),0.25); }
+.editable-element[data-anim-intensity="3"] { --hv-lift: -10px; --hv-grow: 1.02; --hv-zoom: 1.14; --hv-shrink: .93; --hv-glow: 0 12px 35px rgba(var(--acc-rgb),0.35); }
+
+/* 모션 줄이기 설정: 전환은 즉시 끝나고 호버 최종 상태(이미지 교체)는 그대로 동작 */
+@media (prefers-reduced-motion: reduce) {
+  .editable-element,
+  .editable-element img,
+  .editable-element::after { transition: none !important; }
+  .editable-element:hover { translate: none; scale: none; }
+}
+
+.editable-element { cursor: move; }
+/* 선택 표시는 윤곽선만 (선택해도 레이어 순서는 그대로) */
+.editable-element.active-target { outline: 2px dashed var(--acc); }
+.editable-element.multi-selected { outline: 2px solid #2ed573; }
+
+/* ── 레이어 순서 (모든 페이지 공통) ──
+   맨 아래: 페이지 배경(#pageBg, site.css) < 효과 < 도형 < 글 < 달력 < 이미지 < 스티커(맨 위)
+   종류 사이의 층은 --layer, 같은 종류 안의 앞뒤 순서는 --ord (0~999, 에디터가 저장·복원) 로 정함 */
+.editable-element { --layer: 30; --ord: 0; z-index: calc(var(--layer) * 1000 + var(--ord)); }   /* 종류 없는 블록은 글과 같은 층 */
+.editable-element[data-type="effect"]            { --layer: 10; }
+.editable-element[data-type="shape"]             { --layer: 20; }
+.editable-element[data-type="text"]              { --layer: 30; }
+.editable-element[data-type="calendar"]          { --layer: 40; }
+.editable-element[data-type="image"]             { --layer: 50; }
+.editable-element[data-type="sticker"]           { --layer: 60; }
+
+/* 스티커·도형·효과: 이미지/도형만 보이게 (테두리·배경·여백·호버 효과 없음) */
+.editable-element[data-type="sticker"],
+.editable-element[data-type="shape"],
+.editable-element[data-type="effect"] { padding: 0; min-width: 8px; min-height: 8px; }
+.editable-element[data-type="sticker"]::after,
+.editable-element[data-type="shape"]::after,
+.editable-element[data-type="effect"]::after { display: none; }
+/* 방문자 화면에서 효과·도형은 뒤쪽 내용을 가리지 않도록 클릭을 통과시킴 (링크를 건 것만 클릭 가능) */
+body:not(.is-admin) #draggableGallery .editable-element[data-type="effect"]:not([data-link-url]),
+body:not(.is-admin) #draggableGallery .editable-element[data-type="shape"]:not([data-link-url]) { pointer-events: none !important; }
+
+.collab-calendar { font-family: inherit; width: 100%; height: 100%; box-sizing: border-box; text-align: left; }
+.cal-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; margin-bottom: 10px; font-size: 1.1em; color: var(--acc); }
+.cal-prev, .cal-next { cursor: pointer; padding: 0 6px; user-select: none; }
+.cal-prev:hover, .cal-next:hover { color: var(--ink); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; gap: 4px; font-size: 0.85em; }
+.cal-day-name { font-size: 0.8em; padding-bottom: 4px; }
+.cal-date { padding: 4px 0; border-radius: 4px; }
+.cal-date.active { background: #706fd3; color: #fff; font-weight: bold; }
+.cal-schedule-bar { margin-top: 10px; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; display: flex; align-items: center; gap: 8px; }
+
+.panel-group { margin-bottom: 8px; }
+.panel-group label { display: block; font-size: 0.8em; color: #9d947e; margin-bottom: 2px; }
+.panel-group input, .panel-group select { width: 100%; background: #111; border: 1px solid #444; color: #ece5d3; padding: 5px; border-radius: 3px; font-size: 0.9em; box-sizing: border-box; }
+
+/* ── 관리자 편집 중에는 호버로 블록이 떠오르지 않게 (잡고 끌 때 위치가 어긋나 보이는 것 방지) ── */
+.mh-admin-edit .editable-element:hover { translate: none; scale: none; box-shadow: none; }
+/* 크기 조절 손잡이 (선택된 블록의 오른쪽 아래) */
+.mh-admin-edit .editable-element.active-target::before {
+  content: ""; position: absolute; right: 0; bottom: 0;
+  width: 12px; height: 12px; z-index: 4;
+  background: linear-gradient(135deg, transparent 50%, var(--acc) 50%);
+  pointer-events: none;
+}
+
+/* 관리자 편집 중에는 이동/회전 전환 애니메이션을 꺼서 마우스를 즉시 따라오게 */
+.mh-admin-edit .editable-element { transition: none; }
+
+/* ── 라이트 모드: 저장된 기본 색(금색 글자·테두리·배경)을 하늘색 테마로 바꿔 보여줌 ──
+   (직접 고른 다른 색은 그대로 둡니다) */
+:root[data-theme="light"] .editable-element[style*="color: rgb(236, 229, 211)"] { color: var(--ink) !important; }
+:root[data-theme="light"] .editable-element[style*="color: rgb(201, 168, 106)"] { color: var(--acc) !important; }
+:root[data-theme="light"] .editable-element[style*="201, 168, 106"] { border-color: rgba(var(--acc-rgb), .45) !important; }
+:root[data-theme="light"] .editable-element[style*="background-color: rgba(201, 168, 106"] { background-color: rgba(var(--acc-rgb), .08) !important; }
+:root[data-theme="light"] .cal-schedule-bar { background: rgba(var(--acc-rgb), .15) !important; border-color: rgba(var(--acc-rgb), .35) !important; }
+
+/* 관리자 패널: .panel-group 밖에 놓인 숫자·글자 입력칸(RGB 입력 등)도 같은 모양으로 */
+#panelContent input[type="text"],
+#panelContent input[type="number"] { background: #111; border: 1px solid #444; color: #ece5d3; border-radius: 3px; box-sizing: border-box; font-size: 0.9em; }

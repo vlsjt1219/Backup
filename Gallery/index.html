@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>try{if(localStorage.getItem('mafiaz_theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+    <title>MAFIAZ - Gallery</title>
+
+    <!-- Supabase SDK & FontAwesome -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    <!-- CSS 파일 연동 (에디터 스타일 추가) -->
+    <link rel="stylesheet" href="../editor.css">
+    <link rel="stylesheet" href="../site.css">
+    <link rel="stylesheet" href="./gallery.css">
+
+    <!-- 웹폰트 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Nanum+Myeongjo:wght@400;700;800&display=swap" rel="stylesheet">
+
+</head>
+<body>
+
+<div id="pageBg"></div>
+
+<nav id="siteNav">
+    <a href="../index.html">Home</a>
+    <a href="../Story/index.html">Story</a>
+    <a href="../Character/index.html">Character</a>
+    <a href="./index.html" class="is-active">Gallery</a>
+</nav>
+
+<div id="galleryStageArea">
+    <!-- 갤러리 기본 구조를 유지하면서 에디터가 작동할 수 있도록 draggableGallery 지정 -->
+    <div class="gallery-main-container mh-free" id="draggableGallery" style="position: relative; width: 100%;">
+
+        <!-- 1층: 기존 갤러리 콘텐츠 전체를 감싸는 배경 레이어 -->
+        <div style="position: relative; z-index: 1; pointer-events: auto;">
+
+            <!-- 상단 컨트롤 박스 (버튼은 왼쪽, 카테고리는 확실한 중앙 정렬) -->
+            <div style="position: relative; display: flex; align-items: center; margin-bottom: 20px;">
+                <!-- 기능 버튼들 (왼쪽 고정) -->
+                <div class="bottom-control-box" style="margin: 0; display: flex; gap: 8px; z-index: 2;">
+                    <button type="button" onclick="openWriteModal()" class="ctrl-btn write admin-only" title="글쓰기" style="padding:6px 15px; border-radius:15px; cursor:pointer;">✎ 글쓰기</button>
+                    <button type="button" onclick="loadGalleryData()" class="ctrl-btn refresh" title="새로고침" style="padding:6px 15px; border-radius:15px; cursor:pointer;">↻ 새로고침</button>
+                    <button type="button" id="settingBtn" onclick="toggleDesignPanel()" class="ctrl-btn setting" title="설정" style="display:none; padding:6px 15px; border-radius:15px; cursor:pointer; background:#f1c40f; border:none; font-weight:bold; color:#111;">⚙ 설정</button>
+                </div>
+
+                <!-- 카테고리 필터 메뉴 (절대 위치 기반 완벽한 중앙 정렬) -->
+                <div class="category-filter-wrap" style="position: absolute; left: 0; right: 0; margin: 0 auto; display: flex; justify-content: center; gap: 8px; pointer-events: auto; z-index: 1;">
+                    <button class="cate-btn active" onclick="filterCategory('all', this)">전체</button>
+                    <button class="cate-btn" onclick="filterCategory('마피아즈', this)">마피아즈</button>
+                    <button class="cate-btn" onclick="filterCategory('경찰즈', this)">경찰즈</button>
+                </div>
+            </div>
+
+            <div id="tagFilterContainer" class="tag-filter-wrap"></div>
+
+            <div id="log_list" class="gallery-grid-6x4"></div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- 폴라로이드 모달 -->
+<div id="polaroidModal" class="polaroid-modal-overlay" onclick="closePolaroidModal(event)">
+    <div class="modal-nav-btn modal-nav-prev" onclick="navigateModal(-1, event)"><i class="fa fa-chevron-left"></i></div>
+    <div class="modal-nav-btn modal-nav-next" onclick="navigateModal(1, event)"><i class="fa fa-chevron-right"></i></div>
+
+    <div class="polaroid-frame" onclick="event.stopPropagation()">
+        <div class="polaroid-img-box" onclick="openFullImageModal()">
+            <img id="modalImg" src="" alt="img">
+            <div class="zoom-hover-overlay"><i class="fa fa-search-plus" style="margin-right:8px;"></i> 크게 보기</div>
+        </div>
+        <span id="modalTitle" class="polaroid-title-text"></span>
+        <div id="modalTags"></div>
+        <div id="modalDesc" class="polaroid-desc-text"></div>
+        <div class="polaroid-action-btns">
+            <span class="admin-only" onclick="openEditModal()">수정</span>
+            <span class="admin-only" onclick="deleteCurrentPost()">삭제</span>
+            <label id="topImgLabel" style="display:none;">
+                <input type="checkbox" id="topImgChk" onchange="toggleTopImagePosition(this)"> 상단 이미지
+            </label>
+        </div>
+    </div>
+</div>
+
+<div id="fullImageModal" onclick="closeFullImageModal()">
+    <img id="fullImgTarget" src="" alt="full_image">
+</div>
+
+<div id="writeModal" class="uph-modal-overlay">
+    <div class="write-modal-box">
+        <div style="margin-bottom:15px; text-align:center;">
+            <input type="text" id="wr_subject" class="write-input-dark" placeholder="제목을 입력하세요" style="text-align:center; font-weight:bold;">
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <select id="ca_name" class="write-input-dark" style="width:160px;">
+                <option value="마피아즈">마피아즈</option>
+                <option value="경찰즈">경찰즈</option>
+            </select>
+        </div>
+
+        <div style="background:#f9f9f9; padding:15px; border-radius:10px; color:#333; margin-bottom:15px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:12px; color:#888;">FILE #1</span>
+                <input type="file" id="imgFileInput" accept="image/*" class="write-input-dark" style="background:#fff; color:#333; flex:1;">
+                <span id="compressSizeInfo" style="font-size:12px; font-weight:bold; color:#3a9a6a; white-space:nowrap;"></span>
+            </div>
+        </div>
+
+        <div style="margin-bottom:15px;">
+            <textarea id="wr_content" class="write-input-dark" style="height:80px;" placeholder="코멘트 및 #태그를 입력하세요 예: #유코 #모메"></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:center; gap:10px;">
+            <button type="button" id="submitBtn" onclick="submitPostToGithub()" style="background:#f1c40f; border:none; color:#111; font-weight:bold; padding:8px 25px; border-radius:20px; cursor:pointer;">등록하기</button>
+            <button type="button" onclick="closeWriteModal()" style="background:#555; border:none; color:#fff; font-weight:bold; padding:8px 20px; border-radius:20px; cursor:pointer;">취소</button>
+        </div>
+    </div>
+</div>
+
+<script src="../common.js"></script>
+<script src="../editor.js"></script>
+<script>
+    MZ.initLogin({ onLogin: () => location.reload(), onLogout: () => location.reload() });
+    startEditor(MZ.isAdmin(), 'gallery'); // 👈 갤러리 페이지 전용 데이터 연동
+</script>
+<script src="./gallery.js"></script>
+
+</body>
+</html>

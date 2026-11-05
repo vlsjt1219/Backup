@@ -1,0 +1,30 @@
+@charset "utf-8";
+
+/* =====================================================================
+   Story 페이지 (메인 페이지 보드 디자인 공유 + 실시간 텍스트 수정 및 정렬)
+   ===================================================================== */
+body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
+
+#mh-gpfto .mh-in, #mh-gpfto .mh-win { min-height: 0; }
+#mh-gpfto .mh-win { overflow: hidden; }
+
+/* 관리자 패널 스타일 */
+#layoutControlPanel {
+  position: fixed; right: 20px; top: 80px; width: 260px;
+  background: rgba(31, 31, 42, 0.95); border: 1px solid var(--line);
+  border-radius: 8px; padding: 14px; z-index: 9999;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+}
+.mh-admin-edit #draggableGallery { cursor: crosshair; }
+
+/* 에디터 내 글 블록 실시간 편집 및 정렬 스타일 */
+.editable-element[data-type="text"] {
+  outline: none;
+  word-break: break-word;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.editable-element[data-type="text"]:focus {
+  border-color: var(--acc) !important;
+  box-shadow: 0 0 8px rgba(var(--acc-rgb), 0.4);
+}
