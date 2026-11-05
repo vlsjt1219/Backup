@@ -6,6 +6,12 @@
     <script>try{if(localStorage.getItem('mafiaz_theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
     <title>MAFIAZ - Gallery</title>
 
+    <!-- 미리 연결: 데이터·스크립트·글꼴 서버와의 첫 연결 시간을 줄임 -->
+    <link rel="preconnect" href="https://hkwarwmmkzubqvwwyazp.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <!-- Supabase SDK & FontAwesome -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -16,7 +22,8 @@
     <link rel="stylesheet" href="./gallery.css">
 
     <!-- 웹폰트 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <!-- 관리자 설정창에서만 쓰는 글꼴이라 화면을 막지 않고 뒤에서 불러옴 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" media="print" onload="this.media='all'">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Nanum+Myeongjo:wght@400;700;800&display=swap" rel="stylesheet">
 
 </head>
@@ -43,6 +50,8 @@
                 <!-- 기능 버튼들 (왼쪽 고정) -->
                 <div class="bottom-control-box" style="margin: 0; display: flex; gap: 8px; z-index: 2;">
                     <button type="button" onclick="openWriteModal()" class="ctrl-btn write admin-only" title="글쓰기" style="padding:6px 15px; border-radius:15px; cursor:pointer;">✎ 글쓰기</button>
+                    <button type="button" onclick="resetGithubToken()" class="ctrl-btn admin-only" title="GitHub 토큰을 다시 입력" style="padding:6px 15px; border-radius:15px; cursor:pointer;">🔑 토큰 재입력</button>
+                    <button type="button" id="thumbBtn" onclick="generateMissingThumbs()" class="ctrl-btn admin-only" title="썸네일이 없는 이미지의 작은 이미지를 만들어 올림" style="padding:6px 15px; border-radius:15px; cursor:pointer;">🖼 썸네일 만들기</button>
                     <button type="button" onclick="loadGalleryData()" class="ctrl-btn refresh" title="새로고침" style="padding:6px 15px; border-radius:15px; cursor:pointer;">↻ 새로고침</button>
                     <button type="button" id="settingBtn" onclick="toggleDesignPanel()" class="ctrl-btn setting" title="설정" style="display:none; padding:6px 15px; border-radius:15px; cursor:pointer; background:#f1c40f; border:none; font-weight:bold; color:#111;">⚙ 설정</button>
                 </div>

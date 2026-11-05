@@ -4,140 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script>try{if(localStorage.getItem('mafiaz_theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
-    <title>MAFIAZ - Gallery</title>
-
-    <!-- 미리 연결: 데이터·스크립트·글꼴 서버와의 첫 연결 시간을 줄임 -->
-    <link rel="preconnect" href="https://hkwarwmmkzubqvwwyazp.supabase.co" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <title>MAFIAZ - Main</title>
 
     <!-- Supabase SDK & FontAwesome -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-    <!-- CSS 파일 연동 (에디터 스타일 추가) -->
-    <link rel="stylesheet" href="../editor.css">
-    <link rel="stylesheet" href="../site.css">
-    <link rel="stylesheet" href="./gallery.css">
+    <!-- CSS 파일 연동 -->
+    <link rel="stylesheet" href="./editor.css">
+    <link rel="stylesheet" href="./site.css">
 
     <!-- 웹폰트 -->
-    <!-- 관리자 설정창에서만 쓰는 글꼴이라 화면을 막지 않고 뒤에서 불러옴 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" media="print" onload="this.media='all'">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Nanum+Myeongjo:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&family=Zen+Antique&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@400;700&family=Gowun+Batang:wght@400;700&family=Black+Han+Sans&display=swap" rel="stylesheet">
 
 </head>
 <body>
 
+<!-- 페이지 뒷배경 -->
 <div id="pageBg"></div>
 
+<!-- 왼쪽 네비게이션 -->
 <nav id="siteNav">
-    <a href="../index.html">Home</a>
-    <a href="../Story/index.html">Story</a>
-    <a href="../Character/index.html">Character</a>
-    <a href="./index.html" class="is-active">Gallery</a>
+    <a href="./index.html" class="is-active">Home</a>
+    <a href="./Story/index.html">Story</a>
+    <a href="./Character/index.html">Character</a>
+    <a href="./Gallery/index.html">Gallery</a>
 </nav>
 
-<div id="galleryStageArea">
-    <!-- 갤러리 기본 구조를 유지하면서 에디터가 작동할 수 있도록 draggableGallery 지정 -->
-    <div class="gallery-main-container mh-free" id="draggableGallery" style="position: relative; width: 100%;">
+<!-- 화면 스테이지 영역 -->
+<div id="stageArea">
+  <div id="stageFrame">
+    <div id="mh-gpfto" class="mh">
+      <div class="mh-bg"></div>
+      <div class="mh-fx"></div>
+      <div class="mh-in">
+        <div class="mh-win">
+          <div class="mh-bar">
+            <span class="mh-ttl">MAFIAZ</span>
+            <span class="mh-btns" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
 
-        <!-- 1층: 기존 갤러리 콘텐츠 전체를 감싸는 배경 레이어 -->
-        <div style="position: relative; z-index: 1; pointer-events: auto;">
+          <!-- 가이드라인 (관리자 모드 전용) -->
+          <div id="centerSnapLineV" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="centerSnapLineH" style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #ff4757; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineV" style="position: absolute; top: 0; bottom: 0; width: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="elemSnapLineH" style="position: absolute; left: 0; right: 0; height: 1px; background: #2ed573; z-index: 99999; display: none; pointer-events: none;"></div>
+          <div id="selectionMarquee" style="position: absolute; border: 1px dashed #c9a86a; background: rgba(201,168,106,0.15); z-index: 99998; display: none; pointer-events: none;"></div>
 
-            <!-- 상단 컨트롤 박스 (버튼은 왼쪽, 카테고리는 확실한 중앙 정렬) -->
-            <div style="position: relative; display: flex; align-items: center; margin-bottom: 20px;">
-                <!-- 기능 버튼들 (왼쪽 고정) -->
-                <div class="bottom-control-box" style="margin: 0; display: flex; gap: 8px; z-index: 2;">
-                    <button type="button" onclick="openWriteModal()" class="ctrl-btn write admin-only" title="글쓰기" style="padding:6px 15px; border-radius:15px; cursor:pointer;">✎ 글쓰기</button>
-                    <button type="button" onclick="resetGithubToken()" class="ctrl-btn admin-only" title="GitHub 토큰을 다시 입력" style="padding:6px 15px; border-radius:15px; cursor:pointer;">🔑 토큰 재입력</button>
-                    <button type="button" id="thumbBtn" onclick="generateMissingThumbs()" class="ctrl-btn admin-only" title="썸네일이 없는 이미지의 작은 이미지를 만들어 올림" style="padding:6px 15px; border-radius:15px; cursor:pointer;">🖼 썸네일 만들기</button>
-                    <button type="button" onclick="loadGalleryData()" class="ctrl-btn refresh" title="새로고침" style="padding:6px 15px; border-radius:15px; cursor:pointer;">↻ 새로고침</button>
-                    <button type="button" id="settingBtn" onclick="toggleDesignPanel()" class="ctrl-btn setting" title="설정" style="display:none; padding:6px 15px; border-radius:15px; cursor:pointer; background:#f1c40f; border:none; font-weight:bold; color:#111;">⚙ 설정</button>
-                </div>
-
-                <!-- 카테고리 필터 메뉴 (절대 위치 기반 완벽한 중앙 정렬) -->
-                <div class="category-filter-wrap" style="position: absolute; left: 0; right: 0; margin: 0 auto; display: flex; justify-content: center; gap: 8px; pointer-events: auto; z-index: 1;">
-                    <button class="cate-btn active" onclick="filterCategory('all', this)">전체</button>
-                    <button class="cate-btn" onclick="filterCategory('마피아즈', this)">마피아즈</button>
-                    <button class="cate-btn" onclick="filterCategory('경찰즈', this)">경찰즈</button>
-                </div>
-            </div>
-
-            <div id="tagFilterContainer" class="tag-filter-wrap"></div>
-
-            <div id="log_list" class="gallery-grid-6x4"></div>
-
+          <div class="mh-body mh-free" id="draggableGallery" style="position: relative; width: 100%; height: 100%;"></div>
         </div>
-
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- 폴라로이드 모달 -->
-<div id="polaroidModal" class="polaroid-modal-overlay" onclick="closePolaroidModal(event)">
-    <div class="modal-nav-btn modal-nav-prev" onclick="navigateModal(-1, event)"><i class="fa fa-chevron-left"></i></div>
-    <div class="modal-nav-btn modal-nav-next" onclick="navigateModal(1, event)"><i class="fa fa-chevron-right"></i></div>
-
-    <div class="polaroid-frame" onclick="event.stopPropagation()">
-        <div class="polaroid-img-box" onclick="openFullImageModal()">
-            <img id="modalImg" src="" alt="img">
-            <div class="zoom-hover-overlay"><i class="fa fa-search-plus" style="margin-right:8px;"></i> 크게 보기</div>
-        </div>
-        <span id="modalTitle" class="polaroid-title-text"></span>
-        <div id="modalTags"></div>
-        <div id="modalDesc" class="polaroid-desc-text"></div>
-        <div class="polaroid-action-btns">
-            <span class="admin-only" onclick="openEditModal()">수정</span>
-            <span class="admin-only" onclick="deleteCurrentPost()">삭제</span>
-            <label id="topImgLabel" style="display:none;">
-                <input type="checkbox" id="topImgChk" onchange="toggleTopImagePosition(this)"> 상단 이미지
-            </label>
-        </div>
+<!-- 이미지 상세 편집 모달 (관리자 전용) -->
+<div id="imageEditModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; justify-content:center; align-items:center; font-family:'Nanum Myeongjo',serif;">
+  <div style="background:#14101e; border:1px solid #c9a86a; padding:20px; border-radius:8px; width:440px; color:#ece5d3; box-shadow:0 15px 35px rgba(0,0,0,0.7); display:flex; flex-direction:column; align-items:center;">
+    <div style="width:100%; font-weight:bold; color:#c9a86a; margin-bottom:12px; font-size:1.05em; border-bottom:1px solid rgba(201,168,106,0.3); padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+      <span>🖼️ 이미지 구도 및 자르기 편집</span>
+      <button type="button" id="closeImgModal" style="background:none; border:none; color:#ff4757; font-weight:bold; cursor:pointer; font-size:1.1em;">✕</button>
     </div>
-</div>
 
-<div id="fullImageModal" onclick="closeFullImageModal()">
-    <img id="fullImgTarget" src="" alt="full_image">
-</div>
-
-<div id="writeModal" class="uph-modal-overlay">
-    <div class="write-modal-box">
-        <div style="margin-bottom:15px; text-align:center;">
-            <input type="text" id="wr_subject" class="write-input-dark" placeholder="제목을 입력하세요" style="text-align:center; font-weight:bold;">
-        </div>
-        <div style="display:flex; gap:10px; margin-bottom:15px;">
-            <select id="ca_name" class="write-input-dark" style="width:160px;">
-                <option value="마피아즈">마피아즈</option>
-                <option value="경찰즈">경찰즈</option>
-            </select>
-        </div>
-
-        <div style="background:#f9f9f9; padding:15px; border-radius:10px; color:#333; margin-bottom:15px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:12px; color:#888;">FILE #1</span>
-                <input type="file" id="imgFileInput" accept="image/*" class="write-input-dark" style="background:#fff; color:#333; flex:1;">
-                <span id="compressSizeInfo" style="font-size:12px; font-weight:bold; color:#3a9a6a; white-space:nowrap;"></span>
-            </div>
-        </div>
-
-        <div style="margin-bottom:15px;">
-            <textarea id="wr_content" class="write-input-dark" style="height:80px;" placeholder="코멘트 및 #태그를 입력하세요 예: #유코 #모메"></textarea>
-        </div>
-
-        <div style="display:flex; justify-content:center; gap:10px;">
-            <button type="button" id="submitBtn" onclick="submitPostToGithub()" style="background:#f1c40f; border:none; color:#111; font-weight:bold; padding:8px 25px; border-radius:20px; cursor:pointer;">등록하기</button>
-            <button type="button" onclick="closeWriteModal()" style="background:#555; border:none; color:#fff; font-weight:bold; padding:8px 20px; border-radius:20px; cursor:pointer;">취소</button>
-        </div>
+    <div style="display:flex; gap:6px; width:100%; margin-bottom:12px;">
+      <button type="button" id="editTabA" style="flex:1; background:#c9a86a; color:#111; border:none; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 A 편집</button>
+      <button type="button" id="editTabB" style="flex:1; background:#1f1f2a; color:#ece5d3; border:1px solid #c9a86a; padding:6px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.85em;">이미지 B 편집</button>
     </div>
+
+    <div id="cropPreviewContainer" style="position:relative; width:100%; height:260px; background:rgba(0,0,0,0.9); border:2px solid #c9a86a; border-radius:4px; overflow:hidden; display:flex; justify-content:center; align-items:center; margin-bottom:15px; cursor:grab; user-select:none;">
+      <div id="cropInnerBox" style="position:relative; width:100%; height:100%; overflow:hidden; display:flex; justify-content:center; align-items:center;">
+        <img id="modalTargetImg" src="" alt="편집 이미지" style="position:absolute; width:100%; height:100%; object-fit:cover; transform-origin:center center; pointer-events:none; cursor:grab;">
+      </div>
+    </div>
+
+    <div style="width:100%; margin-bottom:15px;">
+      <label style="font-size:0.85em; color:#9d947e; display:block; margin-bottom:4px;">확대/축소 (Zoom)</label>
+      <input type="range" id="modalImgScale" min="0.8" max="6" step="0.1" value="1" style="width:100%; accent-color:#c9a86a;">
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:6px; width:100%;">
+      <button type="button" id="applyImgModal" style="background:#2ed573; border:none; color:#111; font-weight:bold; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:0.9em;">적용 완료</button>
+    </div>
+  </div>
 </div>
 
-<script src="../common.js"></script>
-<script src="../editor.js"></script>
+<script src="./common.js"></script>
+<script src="./editor.js"></script>
 <script>
     MZ.initLogin({ onLogin: () => location.reload(), onLogout: () => location.reload() });
-    startEditor(MZ.isAdmin(), 'gallery'); // 👈 갤러리 페이지 전용 데이터 연동
+    startEditor(MZ.isAdmin(), 'main'); // 👈 메인 페이지 데이터 사용
 </script>
-<script src="./gallery.js"></script>
 
 </body>
 </html>
