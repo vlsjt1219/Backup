@@ -363,3 +363,29 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .table-line-handle.tl-v::after { left: 3px; right: 3px; top: 0; bottom: 0; }
 .table-line-handle.tl-h::after { top: 3px; bottom: 3px; left: 0; right: 0; }
 .table-line-handle:hover::after, .table-line-handle.drag::after { background: rgba(var(--acc-rgb), .85); }
+
+
+/* v8: 노션식 토글 */
+.mz-toggle { display: block; margin: 6px 0; }
+.mz-tg-head { display: flex; align-items: flex-start; gap: 2px; }
+.mz-tg-arrow { flex: 0 0 22px; width: 22px; height: 1.8em; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; color: var(--sub); border-radius: 3px; }
+.mz-tg-arrow:hover { background: rgba(var(--acc-rgb), .15); }
+.mz-tg-arrow::before { content: '\25B6'; font-size: 10px; display: inline-block; transition: transform .15s; }
+.mz-toggle.open > .mz-tg-head > .mz-tg-arrow::before { transform: rotate(90deg); }
+.mz-tg-title { flex: 1 1 auto; min-width: 0; font-weight: 600; min-height: 1.2em; }
+.mz-tg-body { margin-left: 11px; padding-left: 14px; border-left: 2px solid var(--line-soft); }
+.mz-toggle:not(.open) > .mz-tg-body { display: none; }
+.char_content .mz-tg-head { cursor: pointer; }
+.char_content .mz-tg-head:hover .mz-tg-arrow { background: rgba(var(--acc-rgb), .15); }
+
+/* v8: 이미지 원본 보기 모달 */
+.char_image.zoomable, .char_thumb_img.zoomable { cursor: zoom-in; }
+.mz-lightbox { position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,.88); }
+.mzlb-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; }
+.mzlb-stage.grab { cursor: grabbing; }
+.mzlb-img { position: absolute; left: 0; top: 0; max-width: none !important; max-height: none !important; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; opacity: 0; border-radius: 0 !important; }
+.mzlb-msg { position: absolute; left: 0; right: 0; top: 50%; text-align: center; color: #fff; font-size: 14px; pointer-events: none; }
+.mzlb-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 2; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center; max-width: 96vw; box-sizing: border-box; padding: 8px 10px; background: rgba(20,20,24,.88); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; color: #fff; font-size: 13px; }
+.mzlb-bar button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-family: inherit; }
+.mzlb-bar button:hover { background: rgba(255,255,255,.18); }
+.mzlb-zoom { min-width: 46px; text-align: center; }

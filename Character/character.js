@@ -25,6 +25,9 @@
     function hrHtml(k) {
         return '<div class="mz-hr hr-' + k + '" contenteditable="false">' + (HR_MARK[k] ? '<span>' + HR_MARK[k] + '</span>' : '') + '</div><div><br></div>';
     }
+    function toggleHtml(id) {
+        return '<div class="mz-toggle open" data-mzt="' + id + '"><div class="mz-tg-head"><span class="mz-tg-arrow" contenteditable="false"></span><div class="mz-tg-title">토글 제목</div></div><div class="mz-tg-body"><div><br></div></div></div><div><br></div>';
+    }
     // 저장 직전: 안 고친 안내문구(내용을 입력하세요 등)와 선택 표시를 제거
     function cleanEditorHtml(root) {
         root.querySelectorAll('.mz-hr.sel').forEach(n => n.classList.remove('sel'));
@@ -47,12 +50,25 @@
 
     window.startCharacter = function (isAdmin) {
         const app = document.getElementById('charApp');
+
+        // 토글 접기/펼치기: 보기 화면은 제목 줄 전체, 편집 화면은 화살표만 (제목은 글 입력용)
+        app.addEventListener('click', e => {
+            const arrow = e.target.closest('.mz-tg-arrow');
+            const head = e.target.closest('.mz-tg-head');
+            const inEditor = e.target.closest('.editor-content-editable');
+            if (!arrow && !(head && !inEditor)) return;
+            const tg = e.target.closest('.mz-toggle');
+            if (!tg) return;
+            e.preventDefault();
+            tg.classList.toggle('open');
+        });
         let items = [];
         let loaded = false;
         let loadError = '';
 
         MZ.fitStage();
 
+        let lbClose = null;   // 열려 있는 이미지 모달을 닫는 함수
         let formCleanup = null;   // 글쓰기 폼이 닫힐 때 문서 전체에 건 이벤트를 걷어내는 함수
         document.addEventListener('mousedown', e => {
             if (e.target.closest && e.target.closest('.tb-drop')) return;
@@ -89,6 +105,7 @@ alter table characters disable row level security;`;
 
         function render() {
             const r = parseRoute();
+            if (lbClose) lbClose();
             // body에 붙어 있는 표 크기 조절 핸들이 화면 이동 후에도 남지 않도록 정리
             document.querySelectorAll('.table-resize-box, .table-line-layer').forEach(el => el.remove());
             if (formCleanup) { formCleanup(); formCleanup = null; }
@@ -156,6 +173,144 @@ alter table characters disable row level security;`;
                 '<ul class="char_grid">' + gridHtml + '</ul>' + pagerHtml;
         }
 
+        // ───────── 이미지 원본 보기 모달 (확대·축소·이동) ─────────
+        function openImageViewer(url, alt) {
+            if (lbClose) lbClose();
+            const ov = document.createElement('div');
+            ov.className = 'mz-lightbox';
+            ov.setAttribute('role', 'dialog');
+            ov.setAttribute('aria-label', '이미지 원본 보기');
+            ov.innerHTML =
+                '<div class="mzlb-stage"><img class="mzlb-img" alt="' + esc(alt || '') + '" draggable="false"></div>' +
+                '<div class="mzlb-msg">불러오는 중...</div>' +
+                '<div class="mzlb-bar">' +
+                '<button type="button" data-lb="out" title="축소 (-)">－</button>' +
+                '<span class="mzlb-zoom">100%</span>' +
+                '<button type="button" data-lb="in" title="확대 (+)">＋</button>' +
+                '<button type="button" data-lb="fit" title="화면에 맞춤">화면에 맞춤</button>' +
+                '<button type="button" data-lb="one" title="원본 크기 (0)">원본 크기</button>' +
+                '<button type="button" data-lb="close" title="닫기 (Esc)">닫기 ✕</button>' +
+                '</div>';
+            document.body.appendChild(ov);
+            const prevOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+
+            const stage = ov.querySelector('.mzlb-stage');
+            const img = ov.querySelector('.mzlb-img');
+            const zoomLabel = ov.querySelector('.mzlb-zoom');
+            const msg = ov.querySelector('.mzlb-msg');
+            let s = 1, x = 0, y = 0, nw = 0, nh = 0, ready = false;
+            const MIN = 0.05, MAX = 12;
+
+            const apply = () => {
+                img.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+                zoomLabel.textContent = Math.round(s * 100) + '%';
+            };
+            const view = () => { const r = stage.getBoundingClientRect(); return { w: r.width, h: r.height }; };
+            const center = () => { const v = view(); x = (v.w - nw * s) / 2; y = (v.h - nh * s) / 2; };
+            const setOne = () => { s = 1; center(); apply(); };
+            const setFit = () => { const v = view(); s = Math.min(1, (v.w * 0.96) / nw, (v.h * 0.9) / nh); center(); apply(); };
+            // (cx, cy) 화면 좌표를 고정점으로 확대/축소
+            const zoomAt = (cx, cy, ns) => {
+                ns = Math.min(MAX, Math.max(MIN, ns));
+                x = cx - (cx - x) * ns / s;
+                y = cy - (cy - y) * ns / s;
+                s = ns; apply();
+            };
+
+            img.onload = () => {
+                nw = img.naturalWidth; nh = img.naturalHeight;
+                img.style.width = nw + 'px'; img.style.height = nh + 'px';
+                ready = true; msg.style.display = 'none'; img.style.opacity = '1';
+                setOne();   // 원본 크기(100%)로 가운데에 표시
+            };
+            img.onerror = () => { msg.textContent = '이미지를 불러오지 못했습니다.'; };
+            if (MZ.setImgSrc) MZ.setImgSrc(img, url); else img.src = url;
+
+            // 드래그 이동 + 두 손가락 확대/축소
+            const pts = new Map();
+            let pinch = null, moved = 0, downTarget = null;
+            stage.addEventListener('pointerdown', e => {
+                if (e.button !== undefined && e.button > 0) return;
+                try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+                pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                if (pts.size === 1) { moved = 0; downTarget = e.target; }
+                if (pts.size === 2) {
+                    const a = Array.from(pts.values());
+                    pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1, s: s };
+                }
+                stage.classList.add('grab');
+            });
+            stage.addEventListener('pointermove', e => {
+                const p = pts.get(e.pointerId);
+                if (!p || !ready) return;
+                const dx = e.clientX - p.x, dy = e.clientY - p.y;
+                p.x = e.clientX; p.y = e.clientY;
+                moved += Math.abs(dx) + Math.abs(dy);
+                if (pts.size === 1) { x += dx; y += dy; apply(); }
+                else if (pts.size === 2 && pinch) {
+                    const a = Array.from(pts.values());
+                    const d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+                    const r = stage.getBoundingClientRect();
+                    zoomAt((a[0].x + a[1].x) / 2 - r.left, (a[0].y + a[1].y) / 2 - r.top, pinch.s * d / pinch.d);
+                }
+            });
+            const endPtr = e => {
+                if (!pts.has(e.pointerId)) return;
+                pts.delete(e.pointerId); pinch = null;
+                if (!pts.size) {
+                    stage.classList.remove('grab');
+                    // 이미지 바깥 빈 곳을 가볍게 클릭하면 닫기
+                    if (e.type === 'pointerup' && moved < 5 && downTarget === stage) close();
+                }
+            };
+            stage.addEventListener('pointerup', endPtr);
+            stage.addEventListener('pointercancel', endPtr);
+            stage.addEventListener('wheel', e => {
+                e.preventDefault();
+                if (!ready) return;
+                const r = stage.getBoundingClientRect();
+                zoomAt(e.clientX - r.left, e.clientY - r.top, s * Math.exp(-e.deltaY * 0.0015));
+            }, { passive: false });
+            stage.addEventListener('dblclick', e => {
+                if (!ready) return;
+                if (Math.abs(s - 1) < 0.01) setFit(); else setOne();
+            });
+
+            ov.querySelector('.mzlb-bar').addEventListener('click', e => {
+                const b = e.target.closest('[data-lb]');
+                if (!b) return;
+                const k = b.getAttribute('data-lb'), v = view();
+                if (k === 'close') close();
+                else if (!ready) return;
+                else if (k === 'in') zoomAt(v.w / 2, v.h / 2, s * 1.25);
+                else if (k === 'out') zoomAt(v.w / 2, v.h / 2, s / 1.25);
+                else if (k === 'fit') setFit();
+                else if (k === 'one') setOne();
+            });
+
+            const onKey = e => {
+                if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+                if (!ready) return;
+                const v = view();
+                if (e.key === '+' || e.key === '=') zoomAt(v.w / 2, v.h / 2, s * 1.25);
+                else if (e.key === '-' || e.key === '_') zoomAt(v.w / 2, v.h / 2, s / 1.25);
+                else if (e.key === '0') setOne();
+            };
+            const onResize = () => { if (ready) { center(); apply(); } };
+            document.addEventListener('keydown', onKey);
+            window.addEventListener('resize', onResize);
+
+            function close() {
+                document.removeEventListener('keydown', onKey);
+                window.removeEventListener('resize', onResize);
+                document.body.style.overflow = prevOverflow;
+                ov.remove();
+                if (lbClose === close) lbClose = null;
+            }
+            lbClose = close;
+        }
+
         function renderView(id) {
             const idx = items.findIndex(it => String(it.id) === String(id));
             if (idx < 0) { app.innerHTML = '<div class="char_msg">존재하지 않는 캐릭터입니다.<br><br><a href="#/" class="btn">목록</a></div>'; return; }
@@ -193,6 +348,15 @@ alter table characters disable row level security;`;
                       (older ? '<li class="next"><span>다음</span><a href="#/view/' + older.id + '">' + esc(older.subject) + '</a></li>' : '') +
                       '</ul>' : '') +
                 '</article>';
+
+            // 캐릭터 이미지·썸네일 클릭 → 원본 크기 모달
+            [['.char_image', main], ['.char_thumb_img', thumb]].forEach(pair => {
+                const el = app.querySelector(pair[0]);
+                if (!el || !pair[1]) return;
+                el.classList.add('zoomable');
+                el.title = '클릭하면 원본 크기로 볼 수 있습니다';
+                el.addEventListener('click', () => openImageViewer(pair[1], it.subject));
+            });
 
             const share = document.getElementById('btnShare');
             if (share) share.addEventListener('click', async () => {
@@ -272,12 +436,15 @@ alter table characters disable row level security;`;
                 '<button type="button" data-cmd="justifyLeft" title="왼쪽 정렬">좌정렬</button>' +
                 '<button type="button" data-cmd="justifyCenter" title="가운데 정렬">중앙정렬</button>' +
                 '<button type="button" data-cmd="justifyRight" title="오른쪽 정렬">우정렬</button>' +
+                '<select id="edLineHeight" title="줄 간격 (선택한 줄/문단, 커서가 있는 줄에 적용)"><option value="">줄 간격</option><option value="reset">기본</option><option value="1.2">1.2</option><option value="1.5">1.5</option><option value="1.8">1.8</option><option value="2">2.0</option><option value="2.5">2.5</option><option value="3">3.0</option></select>' +
+                '<select id="edLetterSp" title="글자 간격 (자간, 드래그로 선택한 글자에 적용)"><option value="">자간</option><option value="reset">기본</option><option value="-1px">좁게 -1</option><option value="1px">+1</option><option value="2px">+2</option><option value="4px">+4</option><option value="8px">+8</option></select>' +
                 '<span class="tb-sep"></span>' +
                 '<div class="tb-drop" data-drop="quote"><button type="button" class="tb-drop-btn" title="인용구">❝ 인용구 ▾</button>' +
                 '<div class="tb-menu">' + QUOTE_STYLES.map(s => '<button type="button" class="tb-item" data-quote="' + s[0] + '" title="' + s[1] + '"><span class="mz-quote q-' + s[0] + '"><span class="q-text">내용을 입력하세요.</span>' + (s[0] === 'bar' ? '<span class="q-src">출처 입력</span>' : '') + '</span><em>' + s[1] + '</em></button>').join('') + '</div></div>' +
                 '<div class="tb-drop" data-drop="hr"><button type="button" class="tb-drop-btn" title="구분선">─ 구분선 ▾</button>' +
                 '<div class="tb-menu tb-menu-hr">' + HR_STYLES.map(s => '<button type="button" class="tb-item" data-hr="' + s[0] + '" title="' + s[1] + '"><span class="mz-hr hr-' + s[0] + '">' + (HR_MARK[s[0]] ? '<span>' + HR_MARK[s[0]] + '</span>' : '') + '</span><em>' + s[1] + '</em></button>').join('') + '</div></div>' +
                 '<span class="tb-sep"></span>' +
+                '<button type="button" id="edInsertToggle" title="토글(접었다 펼치는 블록) 삽입">▸ 토글</button>' +
                 '<button type="button" id="edInsertTable" title="표 삽입">표 삽입</button>' +
                 // 표 설정은 글 설정 툴바의 두 번째 줄
                 '<div id="tableFloatingMenu" aria-label="표 설정">' +
@@ -743,6 +910,128 @@ alter table characters disable row level security;`;
                 insertBlock(hrHtml(b.getAttribute('data-hr')));
                 b.closest('.tb-drop').classList.remove('open');
             }));
+
+            // ───────── 토글 / 글 간격 ─────────
+            function restoreSel() {
+                contentEditableDiv.focus();
+                const sel = window.getSelection();
+                if (savedRange && contentEditableDiv.contains(savedRange.startContainer)) { sel.removeAllRanges(); sel.addRange(savedRange); }
+                return sel.rangeCount ? sel.getRangeAt(0) : null;
+            }
+
+            // 토글 삽입
+            const toggleBtn = document.getElementById('edInsertToggle');
+            if (toggleBtn) toggleBtn.addEventListener('click', e => {
+                e.preventDefault();
+                const tid = 't' + Date.now();
+                insertBlock(toggleHtml(tid));
+                const box = contentEditableDiv.querySelector('[data-mzt="' + tid + '"]');
+                if (box) {
+                    box.removeAttribute('data-mzt');
+                    placeCaretIn(box.querySelector('.mz-tg-title'));   // 제목을 선택해 두어 바로 타이핑하면 교체됨
+                }
+            });
+            // 토글 키보드: 제목에서 Enter → 안쪽으로, 안쪽 빈 줄에서 Enter → 토글 밖으로, 빈 토글에서 Backspace → 삭제
+            contentEditableDiv.addEventListener('keydown', e => {
+                if (e.isComposing || e.keyCode === 229) return;   // 한글 조합 중에는 건드리지 않음
+                if (e.key !== 'Enter' && e.key !== 'Backspace') return;
+                if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+                const sel = window.getSelection();
+                if (!sel.rangeCount || !sel.isCollapsed) return;
+                let n = sel.anchorNode; if (n && n.nodeType === 3) n = n.parentElement;
+                if (!n || !n.closest || !contentEditableDiv.contains(n)) return;
+                const title = n.closest('.mz-tg-title');
+                const body = n.closest('.mz-tg-body');
+                const isEmpty = el => !el.textContent.replace(/\u200b/g, '').trim() && !el.querySelector('img, table, .mz-hr');
+                if (e.key === 'Enter') {
+                    if (title && contentEditableDiv.contains(title)) {
+                        e.preventDefault();
+                        const tg = title.closest('.mz-toggle');
+                        tg.classList.add('open');
+                        const first = tg.querySelector(':scope > .mz-tg-body > *');
+                        if (first) placeCaretIn(first, true);
+                    } else if (body && contentEditableDiv.contains(body)) {
+                        let line = n; while (line && line.parentElement !== body) line = line.parentElement;
+                        if (line && line.nodeType === 1 && line === body.lastElementChild && isEmpty(line)) {
+                            e.preventDefault();
+                            const tg = body.closest('.mz-toggle');
+                            if (body.children.length > 1) line.remove();
+                            const after = document.createElement('div'); after.innerHTML = '<br>';
+                            tg.after(after);
+                            placeCaretIn(after, true);
+                        }
+                    }
+                } else if (e.key === 'Backspace') {
+                    if (body && contentEditableDiv.contains(body) && body.children.length === 1 && isEmpty(body) && body.contains(n)) {
+                        // 안쪽의 마지막 빈 줄을 지우다가 제목과 합쳐져 구조가 깨지지 않게 제목 끝으로 이동
+                        e.preventDefault();
+                        const t = body.closest('.mz-toggle').querySelector(':scope > .mz-tg-head .mz-tg-title');
+                        if (t) placeCaretIn(t, false);
+                    } else if (title && contentEditableDiv.contains(title) && sel.anchorOffset === 0 && isEmpty(title)) {
+                        const tg = title.closest('.mz-toggle'), tb = tg.querySelector(':scope > .mz-tg-body');
+                        if (!tb || isEmpty(tb)) {
+                            e.preventDefault();
+                            const prev = tg.previousElementSibling;
+                            tg.remove();
+                            if (prev) placeCaretIn(prev, false); else caretToEnd();
+                        }
+                    }
+                }
+            });
+
+            // 줄 간격: 선택한 줄(문단)에 line-height 적용
+            const BLOCK_SEL = 'div, p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th';
+            function ensureBlocks() {
+                // 편집창에 바로 붙은 글자(문단 없이 쓴 첫 줄)는 div로 감싸서 줄 간격을 줄 수 있게 함
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const r = sel.getRangeAt(0);
+                [r.startContainer, r.endContainer].forEach(nd => {
+                    let top = nd;
+                    while (top && top.parentNode !== contentEditableDiv) top = top.parentNode;
+                    if (top && (top.nodeType === 3 || !top.matches(BLOCK_SEL + ', table, ul, ol'))) document.execCommand('formatBlock', false, 'div');
+                });
+            }
+            function applyLineHeight(val) {
+                if (!restoreSel()) return;
+                ensureBlocks();
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                Array.from(contentEditableDiv.querySelectorAll(BLOCK_SEL)).filter(b =>
+                    !b.classList.contains('mz-hr') && !b.querySelector(BLOCK_SEL) && range.intersectsNode(b)
+                ).forEach(b => {
+                    if (val === 'reset') b.style.removeProperty('line-height'); else b.style.lineHeight = val;
+                    if (!b.getAttribute('style')) b.removeAttribute('style');
+                });
+            }
+            // 자간: 선택한 글자를 span으로 감싸 letter-spacing 적용
+            function applyLetterSpacing(val) {
+                const range = restoreSel();
+                if (!range) return;
+                if (range.collapsed) { alert('자간을 바꿀 글자를 먼저 드래그해서 선택해 주세요.'); return; }
+                document.execCommand('styleWithCSS', false, false);
+                document.execCommand('fontSize', false, '7');   // 임시 표식(font size=7)으로 선택 영역을 감싼 뒤 span으로 교체
+                const made = [];
+                contentEditableDiv.querySelectorAll('font[size="7"]').forEach(f => {
+                    const sp = document.createElement('span');
+                    while (f.firstChild) sp.appendChild(f.firstChild);
+                    sp.querySelectorAll('[style*="letter-spacing"]').forEach(x => x.style.removeProperty('letter-spacing'));
+                    sp.style.letterSpacing = (val === 'reset') ? 'normal' : val;
+                    f.replaceWith(sp);
+                    made.push(sp);
+                });
+                if (made.length) {
+                    const rr = document.createRange(), sel = window.getSelection();
+                    rr.setStartBefore(made[0]); rr.setEndAfter(made[made.length - 1]);
+                    sel.removeAllRanges(); sel.addRange(rr);
+                }
+            }
+            [['edLineHeight', applyLineHeight], ['edLetterSp', applyLetterSpacing]].forEach(pair => {
+                const sel = document.getElementById(pair[0]);
+                if (!sel) return;
+                sel.addEventListener('change', () => { const v = sel.value; sel.value = ''; if (v) pair[1](v); });
+            });
 
             // 안내 문구는 글을 쓰기 시작하면 회색(안내) 표시를 뺌
             contentEditableDiv.addEventListener('input', () => {
