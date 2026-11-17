@@ -341,3 +341,8 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .mz-hr.hr-spark > span { font-size: 18px; }
 /* 본문의 선택 가능한 첫 글자 높이 확보 */
 .mz-hr.hr-dots { height: 1.2em; line-height: 1.2em; }
+
+/* ── 이미지 경로 입력칸 + [GitHub에서 선택] 버튼 ── */
+.f_inputrow { display: flex; gap: 6px; align-items: stretch; }
+.f_inputrow input[type=text] { flex: 1 1 auto; min-width: 0; }
+.f_inputrow .btn { flex: none; white-space: nowrap; }

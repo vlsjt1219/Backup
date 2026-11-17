@@ -34,6 +34,11 @@
         });
     }
 
+    // 이미지 주소 → <img> 의 src 속성 문자열. GitHub 선택 창에서 일부만 잘라 고른 주소(#crop=)는 hookImageFallbacks 가 잘린 조각으로 채움
+    function srcAttr(url) {
+        return (String(url).indexOf('#crop=') >= 0 ? 'data-crop-src="' : 'src="') + esc(url) + '"';
+    }
+
     function formatContent(text) {
         if (!text) return '';
         return text;
@@ -101,6 +106,7 @@ alter table characters disable row level security;`;
         }
 
         function hookImageFallbacks() {
+            app.querySelectorAll('img[data-crop-src]').forEach(img => MZ.setImgSrc(img, img.getAttribute('data-crop-src')));
             app.querySelectorAll('img[data-fb]').forEach(img => {
                 img.addEventListener('error', () => {
                     img.style.display = 'none';
@@ -128,7 +134,7 @@ alter table characters disable row level security;`;
                     const src = imgUrl(it.thumb_image || it.char_image);
                     return '<li class="char_item"><a href="#/view/' + it.id + '" class="char_link">' +
                         '<div class="char_thumb' + (src ? '' : ' is-noimg') + '">' +
-                        (src ? '<img src="' + esc(src) + '" alt="' + esc(it.subject) + '" loading="lazy" data-fb>' : '') +
+                        (src ? '<img ' + srcAttr(src) + ' alt="' + esc(it.subject) + '" loading="lazy" data-fb>' : '') +
                         '</div><div class="char_info"><strong class="char_subject">' + esc(it.subject) + '</strong>' +
                         '<span class="char_name">' + esc(it.name) + '</span></div></a></li>';
                 }).join('')
@@ -173,11 +179,11 @@ alter table characters disable row level security;`;
                 '</header>' +
                 '<div class="char_body">' +
                 '<div class="char_image_area">' +
-                (main ? '<div class="char_noimg_box" style="background:none;aspect-ratio:auto;"><img src="' + esc(main) + '" alt="' + esc(it.subject) + '" class="char_image" data-fb></div>'
+                (main ? '<div class="char_noimg_box" style="background:none;aspect-ratio:auto;"><img ' + srcAttr(main) + ' alt="' + esc(it.subject) + '" class="char_image" data-fb></div>'
                       : '<div class="char_noimg_box"><div class="char_noimg">No Image</div></div>') +
                 '</div>' +
                 '<div class="char_content_area">' +
-                (thumb ? '<div class="char_thumb_area"><img src="' + esc(thumb) + '" alt="썸네일" class="char_thumb_img"></div>' : '') +
+                (thumb ? '<div class="char_thumb_area"><img ' + srcAttr(thumb) + ' alt="썸네일" class="char_thumb_img"></div>' : '') +
                 '<div class="char_content">' + formatContent(it.content) + '</div>' +
                 '</div></div>' +
                 ((newer || older)
@@ -224,15 +230,15 @@ alter table characters disable row level security;`;
                 '<div class="f_row"><label for="fName">작성자·소유자 표시 (선택)</label><input type="text" id="fName" value="' + esc(v.name) + '" maxlength="100" placeholder="목록 카드 아래에 표시됩니다"></div>' +
                 '<div class="f_two">' +
                 '<div class="f_box"><label for="fChar">캐릭터 이미지 경로</label>' +
-                '<input type="text" id="fChar" value="' + esc(v.char_image) + '" placeholder="Image/character/char1.webp">' +
+                '<div class="f_inputrow"><input type="text" id="fChar" value="' + esc(v.char_image) + '" placeholder="Image/character/char1.webp"><button type="button" class="btn" id="btnPickChar">GitHub에서 선택</button></div>' +
                 '<div class="f_hint">상세 화면 왼쪽에 크게 보이는 그림입니다.</div>' +
                 '<div class="f_preview" id="pvChar"></div><div class="f_status" id="stChar"></div></div>' +
                 '<div class="f_box"><label for="fThumb">썸네일 이미지 경로</label>' +
-                '<input type="text" id="fThumb" value="' + esc(v.thumb_image) + '" placeholder="Image/character/thumb1.webp">' +
+                '<div class="f_inputrow"><input type="text" id="fThumb" value="' + esc(v.thumb_image) + '" placeholder="Image/character/thumb1.webp"><button type="button" class="btn" id="btnPickThumb">GitHub에서 선택</button></div>' +
                 '<div class="f_hint">목록 카드에 보이는 그림입니다. 비우면 캐릭터 이미지가 대신 쓰입니다.</div>' +
                 '<div class="f_preview" id="pvThumb"></div><div class="f_status" id="stThumb"></div></div>' +
                 '</div>' +
-                '<div class="f_hint" style="margin:-8px 0 16px;">그림 파일은 GitHub 저장소에 올린 뒤 <b>Image/파일명.webp</b> 처럼 경로만 입력하세요.</div>' +
+                '<div class="f_hint" style="margin:-8px 0 16px;">그림 파일은 GitHub 저장소에 올린 뒤 <b>[GitHub에서 선택]</b>으로 고르거나, <b>Image/파일명.webp</b> 처럼 경로를 직접 입력하세요.</div>' +
                 '<div class="f_row"><label>내용</label>' +
                 // 툴바 구성
                 '<div class="editor-toolbar">' +
@@ -692,13 +698,25 @@ alter table characters disable row level security;`;
                     const img = new Image();
                     img.onload = () => { if (my !== seq) return; pv.appendChild(img); st.style.color = '#2ed573'; st.textContent = '✔ 이미지를 불러왔습니다'; };
                     img.onerror = () => { if (my !== seq) return; st.style.color = '#ff4757'; st.textContent = '✖ 이미지를 불러오지 못했습니다.'; };
-                    img.src = url;
+                    MZ.setImgSrc(img, url);
                 }
                 input.addEventListener('input', update);
                 update();
             }
             bindPreview('fThumb', 'pvThumb', 'stThumb');
             bindPreview('fChar', 'pvChar', 'stChar');
+
+            // GitHub 저장소에서 그림 고르기 (메인 페이지 스티커/이미지 블록과 같은 선택 창)
+            [['fChar', 'btnPickChar'], ['fThumb', 'btnPickThumb']].forEach(pair => {
+                const input = document.getElementById(pair[0]);
+                document.getElementById(pair[1]).addEventListener('click', () => {
+                    if (!MZ.pickGithubImage) { alert('GitHub 이미지 선택 기능을 불러오지 못했습니다. (common.js 를 확인하세요)'); return; }
+                    MZ.pickGithubImage({
+                        accept: 'image',
+                        onPick: url => { input.value = url; input.dispatchEvent(new Event('input')); }   // 미리보기도 바로 갱신
+                    });
+                });
+            });
 
             document.getElementById('charForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
