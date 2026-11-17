@@ -222,7 +222,7 @@ alter table characters disable row level security;`;
                 nw = img.naturalWidth; nh = img.naturalHeight;
                 img.style.width = nw + 'px'; img.style.height = nh + 'px';
                 ready = true; msg.style.display = 'none'; img.style.opacity = '1';
-                setOne();   // 원본 크기(100%)로 가운데에 표시
+                setFit();   // 처음에는 화면에 맞춰 가운데에 표시 (원본 크기는 버튼/더블클릭)
             };
             img.onerror = () => { msg.textContent = '이미지를 불러오지 못했습니다.'; };
             if (MZ.setImgSrc) MZ.setImgSrc(img, url); else img.src = url;
