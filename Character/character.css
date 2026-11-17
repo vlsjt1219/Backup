@@ -90,7 +90,7 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .char_meta { font-size: 13px; color: var(--sub); }
 
 /* 윗영역: 왼쪽 이미지 / 오른쪽 썸네일+내용 (좌우 비율은 --split, 높이는 .fixed-h 일 때 인라인 height) */
-.char_top { display: grid; grid-template-columns: var(--split, 46%) minmax(0, 1fr); column-gap: 24px; align-items: start; position: relative; }
+.char_top { display: grid; grid-template-columns: var(--split, 46%) minmax(0, 1fr); column-gap: 10px; align-items: start; position: relative; }
 .char_image_area { min-width: 0; position: relative; }
 .char_image { width: 100%; height: auto; border-radius: 5px; display: block; }
 .char_noimg_box { position: relative; width: 100%; aspect-ratio: 3 / 4; background: rgba(var(--acc-rgb), .06); border-radius: 5px; }
@@ -287,7 +287,7 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .tb-item .mz-hr.hr-line, .tb-item .mz-hr.hr-dash { width: 80%; }
 
 /* ── 인용구 공통 ── */
-.mz-quote { display: block; margin: 26px 0; padding: 0; position: relative; box-sizing: border-box; line-height: 1.8; }
+.mz-quote { display: block; margin: 10px 0; padding: 0; position: relative; box-sizing: border-box; line-height: 1.8; }
 .mz-quote .q-text, .mz-quote .q-src { display: block; min-height: 1.2em; }
 .mz-quote .q-src { margin-top: 6px; font-size: .8em; color: var(--sub); }
 .mz-quote .ph, .mz-hr .ph { color: var(--sub); }
@@ -330,7 +330,7 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .mz-quote.q-frame::after  { right: 0; bottom: 0; border-bottom-width: 2px; border-right-width: 2px; }
 
 /* ── 구분선 ── */
-.mz-hr { display: block; margin: 30px auto; text-align: center; color: var(--sub); user-select: none; cursor: default; box-sizing: border-box; border-radius: 2px; }
+.mz-hr { display: block; margin: 10px auto; text-align: center; color: var(--sub); user-select: none; cursor: default; box-sizing: border-box; border-radius: 2px; }
 .mz-hr.sel { outline: 2px dashed var(--acc); outline-offset: 8px; }
 .mz-hr.hr-short { width: 64px; border-top: 3px solid var(--ink); }
 .mz-hr.hr-line { width: 100%; border-top: 1px solid rgba(var(--acc-rgb), .55); }
@@ -412,7 +412,7 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .char_bottom_edit { margin-top: 0; border-top: none; padding-top: 0; }
 .char_top .editor-content-editable { overflow: visible; min-height: 220px; }
 .char_bottom .editor-content-editable { min-height: 180px; overflow: visible; }
-.char_content.editor-content-editable { padding: 12px; border-radius: 4px; }
+.char_content.editor-content-editable { padding: 4px; border-radius: 4px; }
 
 /* 비어 있는 글칸 안내 문구 */
 .editor-content-editable.is-empty::before {
@@ -486,3 +486,28 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 }
 .lay-v .lay-label { top: 6px; left: 12px; }
 .lay-h .lay-label { top: -8px; right: 0; }
+
+/* ───────── 글 목록(번호/글머리) ───────── */
+.editor-content-editable ol, .editor-content-editable ul, .char_content ol, .char_content ul { margin: 6px 0; padding-left: 1.7em; }
+.editor-content-editable ol, .char_content ol { list-style: decimal outside; }
+.editor-content-editable ul, .char_content ul { list-style: disc outside; }
+.editor-content-editable ol ol, .char_content ol ol { list-style: lower-alpha outside; }
+.editor-content-editable ul ul, .char_content ul ul { list-style: circle outside; }
+.editor-content-editable li, .char_content li { margin: 2px 0; padding-left: 2px; }
+.editor-content-editable li::marker, .char_content li::marker { color: var(--acc); }
+.editor-toolbar .tb-list { white-space: nowrap; }
+
+/* ───────── 레이아웃 적용 범위 ───────── */
+.lay_scope { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; margin-right: 8px; }
+.lay_scope select { font-size: 12px; padding: 3px 4px; }
+
+/* ───────── 목록 순서 변경 ───────── */
+.ord_hint { font-size: 12px; color: var(--acc); margin: 0 0 12px; padding: 8px 12px; border: 1px dashed rgba(var(--acc-rgb), .5); border-radius: 6px; }
+.char_list_btn { display: flex; gap: 8px; align-items: center; }
+.char_grid.is-reorder .char_item { position: relative; cursor: grab; outline: 1px dashed rgba(var(--acc-rgb), .45); outline-offset: 3px; }
+.char_grid.is-reorder .char_item.dragging { opacity: .35; }
+.char_grid.is-reorder .char_item.drop-on { outline: 2px solid var(--acc); }
+.char_grid.is-reorder .char_link { pointer-events: none; }
+.ord_ctl { position: absolute; z-index: 5; top: 6px; left: 6px; right: 6px; display: flex; justify-content: space-between; pointer-events: none; }
+.ord_ctl button { pointer-events: auto; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--acc); background: rgba(0,0,0,.7); color: var(--acc); font-size: 12px; }
+.ord_ctl button:hover { background: var(--acc); color: #000; }

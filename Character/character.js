@@ -21,6 +21,7 @@
 alter table characters add column if not exists layout text default '';`;
 
     // 레이아웃 기본값: split = 왼쪽(이미지) 칸 너비 %, topH = 윗영역 높이(px, null 이면 내용에 맞춰 자동)
+    const SETTINGS_ID = 'char_settings';   // layouts 표의 한 줄: { layout: {split, topH}|null, order: [글 id, ...] }
     const DEF_SPLIT = 46, SPLIT_MIN = 20, SPLIT_MAX = 75, TOPH_MIN = 200;
     function parseLayout(s) {
         const d = { split: DEF_SPLIT, topH: null };
@@ -109,6 +110,9 @@ alter table characters add column if not exists layout text default '';`;
             '<select id="edLineHeight" title="줄 간격 (선택한 줄/문단, 커서가 있는 줄에 적용)"><option value="">줄 간격</option><option value="reset">기본</option><option value="1.2">1.2</option><option value="1.5">1.5</option><option value="1.8">1.8</option><option value="2">2.0</option><option value="2.5">2.5</option><option value="3">3.0</option></select>' +
             '<select id="edLetterSp" title="글자 간격 (자간, 드래그로 선택한 글자에 적용)"><option value="">자간</option><option value="reset">기본</option><option value="-1px">좁게 -1</option><option value="1px">+1</option><option value="2px">+2</option><option value="4px">+4</option><option value="8px">+8</option></select>' +
             '<span class="tb-sep"></span>' +
+            '<button type="button" data-cmd="insertOrderedList" title="번호 목록 (1. 2. 3.) · Tab: 들여쓰기 / Shift+Tab: 내어쓰기" class="tb-list">1.&#8201;리스트</button>' +
+            '<button type="button" data-cmd="insertUnorderedList" title="글머리 기호 목록 (•) · Tab: 들여쓰기 / Shift+Tab: 내어쓰기" class="tb-list">•&#8201;리스트</button>' +
+            '<span class="tb-sep"></span>' +
             '<div class="tb-drop" data-drop="quote"><button type="button" class="tb-drop-btn" title="인용구">❝ 인용구 ▾</button>' +
             '<div class="tb-menu">' + QUOTE_STYLES.map(s => '<button type="button" class="tb-item" data-quote="' + s[0] + '" title="' + s[1] + '"><span class="mz-quote q-' + s[0] + '"><span class="q-text">내용을 입력하세요.</span>' + (s[0] === 'bar' ? '<span class="q-src">출처 입력</span>' : '') + '</span><em>' + s[1] + '</em></button>').join('') + '</div></div>' +
             '<div class="tb-drop" data-drop="hr"><button type="button" class="tb-drop-btn" title="구분선">─ 구분선 ▾</button>' +
@@ -156,6 +160,8 @@ alter table characters add column if not exists layout text default '';`;
             tg.classList.toggle('open');
         });
         let items = [];
+        let gset = { layout: null, order: [] };   // 전체 설정 (공통 레이아웃 · 목록 순서)
+        let reorder = false, reorderSnap = null;  // 목록 순서 변경 모드
         let loaded = false;
         let loadError = '';
 
@@ -173,8 +179,29 @@ alter table characters add column if not exists layout text default '';`;
             const { data, error } = await sb.from(TABLE).select('*').order('id', { ascending: false });
             if (error) { loadError = error.message || String(error); return; }
             items = data || [];
+            gset = { layout: null, order: [] };
+            try { const g = await MZ.fetchSettings(SETTINGS_ID); if (g) { gset.layout = g.layout || null; gset.order = Array.isArray(g.order) ? g.order.map(String) : []; } } catch (e) { /* 설정이 없으면 기본값 */ }
+            applyOrder();
             loaded = true;
             loadError = '';
+        }
+
+        // 저장된 순서대로 정렬. 순서에 없는 새 글은 맨 앞(최신순)에 둠
+        function applyOrder() {
+            const pos = {}; gset.order.forEach((id, i) => { pos[id] = i; });
+            const fresh = items.filter(x => pos[String(x.id)] === undefined);
+            const known = items.filter(x => pos[String(x.id)] !== undefined).sort((a, b) => pos[String(a.id)] - pos[String(b.id)]);
+            items = fresh.concat(known);
+        }
+        async function saveSettings() {
+            const row = {
+                id: SETTINGS_ID, page_name: '__settings__', type: 'settings',
+                left: '', top: '', width: '', height: '', content: '', border: '',
+                backgroundColor: '', borderRadius: '', fontFamily: '', color: '', linkUrl: '',
+                layout_data: { layout: gset.layout, order: gset.order }
+            };
+            const { error } = await sb.from(MZ.TABLE).upsert([row]);
+            return error;
         }
 
         function parseRoute() {
@@ -220,7 +247,7 @@ alter table characters add column if not exists layout text default '';`;
             const filtered = cat ? items.filter(it => it.category === cat) : items;
             const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
             page = Math.min(Math.max(1, page), pages);
-            const slice = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+            const slice = (isAdmin && reorder) ? filtered : filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
             const catHtml = cats.length
                 ? '<nav><ul class="char_cate_nav"><li><a href="#/" class="' + (!cat ? 'on' : '') + '">전체</a></li>' +
@@ -231,7 +258,9 @@ alter table characters add column if not exists layout text default '';`;
             const gridHtml = slice.length
                 ? slice.map(it => {
                     const src = imgUrl(it.thumb_image || it.char_image);
-                    return '<li class="char_item"><a href="#/view/' + it.id + '" class="char_link">' +
+                    return '<li class="char_item' + (reorder ? ' is-sortable' : '') + '" data-id="' + it.id + '"' + (reorder ? ' draggable="true"' : '') + '>' +
+                        (reorder ? '<div class="ord_ctl"><button type="button" data-mv="-1" title="앞으로">◀</button><button type="button" data-mv="1" title="뒤로">▶</button></div>' : '') +
+                        '<a href="#/view/' + it.id + '" class="char_link">' +
                         '<div class="char_thumb' + (src ? '' : ' is-noimg') + '">' +
                         (src ? '<img ' + srcAttr(src) + ' alt="' + esc(it.subject) + '" loading="lazy" data-fb>' : '') +
                         '</div><div class="char_info"><strong class="char_subject">' + esc(it.subject) + '</strong>' +
@@ -240,7 +269,7 @@ alter table characters add column if not exists layout text default '';`;
                 : '<li class="char_empty">등록된 캐릭터가 없습니다.</li>';
 
             let pagerHtml = '';
-            if (pages > 1) {
+            if (pages > 1 && !(isAdmin && reorder)) {
                 pagerHtml = '<div class="char_pages">';
                 for (let i = 1; i <= pages; i++) {
                     pagerHtml += '<a href="#/list/' + encodeURIComponent(cat) + '/' + i + '" class="' + (i === page ? 'on' : '') + '">' + i + '</a>';
@@ -250,8 +279,64 @@ alter table characters add column if not exists layout text default '';`;
 
             app.innerHTML =
                 '<div class="char_list_top">' + catHtml +
-                '<div class="char_list_btn">' + (isAdmin ? '<a href="#/write" class="btn btn_primary">글쓰기</a>' : '') + '</div></div>' +
-                '<ul class="char_grid">' + gridHtml + '</ul>' + pagerHtml;
+                '<div class="char_list_btn">' + (isAdmin
+                    ? (reorder
+                        ? '<button type="button" class="btn" id="btnOrdCancel">취소</button><button type="button" class="btn btn_primary" id="btnOrdSave">순서 저장</button>'
+                        : '<button type="button" class="btn" id="btnOrd">순서 변경</button><a href="#/write" class="btn btn_primary">글쓰기</a>')
+                    : '') + '</div></div>' +
+                (reorder ? '<div class="ord_hint">카드를 끌어다 놓거나 ◀ ▶ 버튼으로 순서를 바꾼 뒤 [순서 저장]을 누르세요.' + (cat ? ' (현재 분류 안에서의 순서)' : '') + '</div>' : '') +
+                '<ul class="char_grid' + (reorder ? ' is-reorder' : '') + '">' + gridHtml + '</ul>' + pagerHtml;
+            if (isAdmin) bindReorder(cat, page);
+        }
+
+        function bindReorder(cat, page) {
+            const b1 = document.getElementById('btnOrd');
+            if (b1) b1.addEventListener('click', () => { reorder = true; reorderSnap = items.slice(); render(); });
+            const bc = document.getElementById('btnOrdCancel');
+            if (bc) bc.addEventListener('click', () => { items = reorderSnap || items; reorder = false; reorderSnap = null; render(); });
+            const bs = document.getElementById('btnOrdSave');
+            if (bs) bs.addEventListener('click', async () => {
+                bs.disabled = true; bs.textContent = '저장중';
+                const prev = gset.order;
+                gset.order = items.map(x => String(x.id));
+                const err = await saveSettings();
+                if (err) {
+                    gset.order = prev; bs.disabled = false; bs.textContent = '순서 저장';
+                    alert('순서 저장 실패: ' + (err.message || err) + '\n\n(layouts 표에 쓸 수 있는 권한이 필요합니다.)');
+                    return;
+                }
+                reorder = false; reorderSnap = null; render();
+            });
+            if (!reorder) return;
+            const grid = app.querySelector('.char_grid');
+            const keepScroll = fn => { const y = window.scrollY, t = app.scrollTop; fn(); window.scrollTo(0, y); app.scrollTop = t; };
+            // from 글을 to 글 자리로 옮김 (전체 목록 기준)
+            const moveTo = (fromId, toId) => {
+                const a = items.findIndex(x => String(x.id) === String(fromId)), b = items.findIndex(x => String(x.id) === String(toId));
+                if (a < 0 || b < 0 || a === b) return;
+                const [m] = items.splice(a, 1); items.splice(b, 0, m);
+            };
+            grid.querySelectorAll('[data-mv]').forEach(btn => btn.addEventListener('click', e => {
+                e.preventDefault(); e.stopPropagation();
+                const li = btn.closest('.char_item'), id = li.getAttribute('data-id'), d = parseInt(btn.getAttribute('data-mv'));
+                const vis = Array.from(grid.querySelectorAll('.char_item')).map(n => n.getAttribute('data-id'));
+                const vi = vis.indexOf(id), tgt = vis[vi + d];
+                if (tgt === undefined) return;
+                moveTo(id, tgt);
+                keepScroll(() => renderList(cat, page));
+            }));
+            let dragId = null;
+            grid.querySelectorAll('.char_item').forEach(li => {
+                li.addEventListener('dragstart', e => { dragId = li.getAttribute('data-id'); li.classList.add('dragging'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); } catch (x) {} });
+                li.addEventListener('dragend', () => { li.classList.remove('dragging'); grid.querySelectorAll('.drop-on').forEach(n => n.classList.remove('drop-on')); });
+                li.addEventListener('dragover', e => { if (dragId === null) return; e.preventDefault(); grid.querySelectorAll('.drop-on').forEach(n => n.classList.remove('drop-on')); li.classList.add('drop-on'); });
+                li.addEventListener('drop', e => {
+                    e.preventDefault();
+                    const to = li.getAttribute('data-id');
+                    if (dragId !== null && dragId !== to) { moveTo(dragId, to); dragId = null; keepScroll(() => renderList(cat, page)); }
+                });
+                li.querySelector('.char_link').addEventListener('click', e => e.preventDefault());
+            });
         }
 
         // ───────── 이미지 원본 보기 모달 (확대·축소·이동) ─────────
@@ -402,7 +487,10 @@ alter table characters add column if not exists layout text default '';`;
             if (!isNew && !it) { app.innerHTML = '<div class="char_msg">존재하지 않는 캐릭터입니다.<br><br><a href="#/" class="btn">목록</a></div>'; return; }
             const editing = !!(edit && isAdmin);   // 편집 모드(붉은 선·+버튼·툴바)는 관리자에게만
             const v = it || { category: '', subject: '', name: '', content: '', content_bottom: '', char_image: '', thumb_image: '', layout: '' };
-            const lay = parseLayout(v.layout);
+            const hasOwn = !!(v.layout && String(v.layout).trim());
+            const lay = parseLayout(hasOwn ? v.layout : gset.layout);   // 개별 설정이 없으면 전체 설정을 따름
+            let layScope = 'own';   // own = 이 글만(개별) · all = 모든 글에 전체 적용 · inherit = 전체 설정 따르기
+            if (!isNew && !hasOwn) layScope = 'inherit';
             const state = { char: v.char_image || '', thumb: v.thumb_image || '' };
             const idx = it ? items.indexOf(it) : -1;
             const newer = idx > 0 ? items[idx - 1] : null;
@@ -462,7 +550,9 @@ alter table characters add column if not exists layout text default '';`;
             const editBar = editing
                 ? '<div class="char_edit_bar">' + toolbarHtml() +
                   '<div class="char_edit_hint"><span>붉은 선을 끌어 레이아웃을 조절하세요 · 선을 더블클릭하면 초기값 · <b>Ctrl+S</b> 저장</span>' +
-                  '<span class="char_edit_btns"><button type="button" class="btn" id="btnLayReset">레이아웃 초기화</button>' +
+                  '<span class="char_edit_btns"><label class="lay_scope" title="붉은 선으로 조절한 레이아웃을 어디에 적용할지 고릅니다">레이아웃 적용 ' +
+                  '<select id="layScope"><option value="own">개별 적용 (이 글만)</option><option value="all">전체 적용 (모든 글)</option><option value="inherit">전체 설정 따르기</option></select></label>' +
+                  '<button type="button" class="btn" id="btnLayReset">레이아웃 초기화</button>' +
                   '<button type="button" class="btn btn_primary" data-do="save">저장</button></span></div></div>'
                 : '';
 
@@ -610,7 +700,19 @@ alter table characters add column if not exists layout text default '';`;
             }
             bindLayoutHandle(document.getElementById('layV'), 'v');
             bindLayoutHandle(document.getElementById('layH'), 'h');
+            const scopeSel = document.getElementById('layScope');
+            scopeSel.value = layScope;
+            scopeSel.addEventListener('change', () => {
+                layScope = scopeSel.value; markDirty();
+                if (layScope === 'inherit') {   // 전체 설정 값으로 되돌려 미리 보여줌
+                    const g = parseLayout(gset.layout); lay.split = g.split; lay.topH = g.topH; applyLayout();
+                }
+            });
+            // 붉은 선을 움직이면, 따르기 상태였던 글은 개별 적용으로 전환
+            const markLay = () => { if (layScope === 'inherit') { layScope = 'own'; scopeSel.value = 'own'; } };
+            ['layV', 'layH'].forEach(i => { const h = document.getElementById(i); h.addEventListener('pointerdown', markLay); h.addEventListener('dblclick', markLay); });
             document.getElementById('btnLayReset').addEventListener('click', () => {
+                markLay();
                 lay.split = DEF_SPLIT; lay.topH = null; markDirty(); applyLayout();
             });
 
@@ -635,10 +737,26 @@ alter table characters add column if not exists layout text default '';`;
                 };
                 const extra = {
                     content_bottom: collect(fBottom),
-                    layout: JSON.stringify({ split: lay.split, topH: lay.topH })
+                    layout: layScope === 'inherit' ? '' : JSON.stringify({ split: lay.split, topH: lay.topH })
                 };
+                if (layScope === 'all') {
+                    if (!confirm('이 레이아웃을 모든 글에 적용할까요?\n\n다른 글에 따로 저장해 둔 개별 레이아웃은 모두 지워지고, 전체 설정을 따르게 됩니다.')) return;
+                    extra.layout = '';   // 이 글도 전체 설정을 따름
+                }
                 const btns = app.querySelectorAll('[data-do="save"]');
                 const setBusy = on => btns.forEach(b => { b.disabled = on; if (b.classList.contains('btn_primary') && !b.closest('.char_edit_btns')) b.textContent = on ? '저장중' : (isNew ? '작성완료' : '저장'); });
+                const writeGlobal = async () => {
+                    const prevL = gset.layout;
+                    gset.layout = { split: lay.split, topH: lay.topH };
+                    let err = await saveSettings();
+                    if (!err) {
+                        const r2 = await sb.from(TABLE).update({ layout: '' }).not('id', 'is', null);
+                        err = r2.error;
+                        if (err && /layout/i.test(err.message || '')) err = null;   // layout 칸이 아직 없으면 지울 것도 없음
+                    }
+                    if (err) { gset.layout = prevL; return err; }
+                    return null;
+                };
                 const write = r => isNew
                     ? sb.from(TABLE).insert([r]).select().single()
                     : sb.from(TABLE).update(r).eq('id', it.id).select().single();
@@ -655,6 +773,10 @@ alter table characters add column if not exists layout text default '';`;
                     alert('저장 실패: ' + (res.error.message || res.error));
                     setBusy(false);
                     return;
+                }
+                if (layScope === 'all') {
+                    const gerr = await writeGlobal();
+                    if (gerr) alert('글은 저장되었지만 전체 적용에 실패했습니다: ' + (gerr.message || gerr) + '\n\n(layouts 표에 쓸 수 있는 권한이 필요합니다.)');
                 }
                 dirty = false;
                 const savedId = it ? it.id : (res.data && res.data.id);
@@ -1281,6 +1403,13 @@ alter table characters add column if not exists layout text default '';`;
                         let node = selection && selection.anchorNode;
                         if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
                         const cell = node && node.closest ? node.closest('td, th') : null;
+                        const li = (!cell && node && node.closest) ? node.closest('li') : null;
+                        if (li && el.contains(li)) {
+                            e.preventDefault();
+                            document.execCommand(e.shiftKey ? 'outdent' : 'indent', false, null);
+                            markDirty();
+                            return;
+                        }
                         if (cell && el.contains(cell)) {
                             const table = cell.closest('table');
                             if (table) {
