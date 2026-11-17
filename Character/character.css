@@ -89,8 +89,9 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .char_cate { display: inline-block; padding: 2px 8px; font-size: 11px; color: var(--acc); border: 1px solid var(--line); border-radius: 3px; margin-right: 6px; vertical-align: middle; }
 .char_meta { font-size: 13px; color: var(--sub); }
 
-.char_body { display: flex; gap: 30px; align-items: flex-start; }
-.char_image_area { flex: 0 0 min(600px, 46%); max-width: 600px; position: relative; }
+/* 윗영역: 왼쪽 이미지 / 오른쪽 썸네일+내용 (좌우 비율은 --split, 높이는 .fixed-h 일 때 인라인 height) */
+.char_top { display: grid; grid-template-columns: var(--split, 46%) minmax(0, 1fr); column-gap: 24px; align-items: start; position: relative; }
+.char_image_area { min-width: 0; position: relative; }
 .char_image { width: 100%; height: auto; border-radius: 5px; display: block; }
 .char_noimg_box { position: relative; width: 100%; aspect-ratio: 3 / 4; background: rgba(var(--acc-rgb), .06); border-radius: 5px; }
 .char_content_area { flex: 1; min-width: 0; }
@@ -201,8 +202,10 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .btn_confirm .btn { padding: 11px 30px; font-size: 14px; }
 
 @media (max-width: 900px) {
-  .char_body { flex-direction: column; }
-  .char_image_area { flex: none; max-width: 100%; width: 100%; }
+  .char_top, .char_top.fixed-h { grid-template-columns: 1fr; height: auto !important; row-gap: 20px; }
+  .char_top.fixed-h .char_content_area { overflow: visible; }
+  .char_top.fixed-h .char_image, .char_top.fixed-h .slot_img { height: auto; }
+  .lay-handle { display: none !important; }
 }
 @media (max-width: 768px) {
   #charApp { padding: 14px; }
@@ -389,3 +392,97 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .mzlb-bar button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-family: inherit; }
 .mzlb-bar button:hover { background: rgba(255,255,255,.18); }
 .mzlb-zoom { min-width: 46px; text-align: center; }
+
+
+/* =====================================================================
+   v9: 보기 화면에서 바로 편집 (관리자 편집 모드 전용 요소들)
+   ===================================================================== */
+
+/* 윗영역 높이를 고정했을 때: 이미지는 영역에 맞추고, 오른쪽 글은 영역 안에서 스크롤 */
+.char_top.fixed-h { align-items: stretch; }
+.char_top.fixed-h .char_image_area { height: 100%; min-height: 0; }
+.char_top.fixed-h .char_image_area > .char_image,
+.char_top.fixed-h .img_slot_char { height: 100%; }
+.char_top.fixed-h .char_image, .char_top.fixed-h .slot_img { height: 100%; object-fit: contain; object-position: center top; }
+.char_top.fixed-h .img_slot_char:not(.has-img) { aspect-ratio: auto; }
+.char_top.fixed-h .char_content_area { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(var(--acc-rgb), .5) transparent; }
+
+/* 최하단 글 영역 */
+.char_bottom { margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--line-soft); }
+.char_bottom_edit { margin-top: 0; border-top: none; padding-top: 0; }
+.char_top .editor-content-editable { overflow: visible; min-height: 220px; }
+.char_bottom .editor-content-editable { min-height: 180px; overflow: visible; }
+.char_content.editor-content-editable { padding: 12px; border-radius: 4px; }
+
+/* 비어 있는 글칸 안내 문구 */
+.editor-content-editable.is-empty::before {
+  content: attr(data-ph); position: absolute; left: 12px; top: 12px; right: 12px;
+  color: var(--sub); opacity: .7; pointer-events: none;
+}
+
+/* 편집 헤더: 분류 / 제목 / 작성자 입력칸 */
+.ie_row { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.ie {
+  background: var(--field-bg); color: var(--ink); border: 1px solid var(--field-line); border-radius: 4px;
+  padding: 6px 10px; font-family: inherit; text-align: center; box-sizing: border-box; max-width: 100%;
+}
+.ie:focus { outline: none; border-color: var(--acc); }
+.ie-cate { width: 110px; font-size: 12px; }
+.ie-title { width: min(320px, 100%); font-size: 18px; font-weight: bold; }
+.ie-name { width: min(240px, 100%); font-size: 13px; margin-top: 6px; }
+
+/* 편집 중 위쪽에 고정되는 툴바 */
+.char_edit_bar {
+  position: sticky; top: 0; z-index: 40; margin: 0 -4px 18px; padding: 8px 4px 6px;
+  background: rgb(var(--win-rgb)); border-bottom: 1px solid var(--line-soft);
+}
+.char_edit_bar .editor-toolbar { border-bottom: 1px solid var(--field-line); border-radius: 4px; }
+.char_edit_hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; color: var(--sub); }
+.char_edit_btns { display: flex; gap: 6px; }
+
+/* 이미지 칸 (+ 버튼으로 GitHub 이미지 선택) */
+.img_slot { position: relative; width: 100%; border-radius: 5px; overflow: hidden; box-sizing: border-box; }
+.img_slot:not(.has-img) {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(var(--acc-rgb), .06); border: 1px dashed var(--line);
+}
+.img_slot_char:not(.has-img) { aspect-ratio: 3 / 4; }
+.img_slot_thumb:not(.has-img) { aspect-ratio: 7 / 8; }
+.slot_plus {
+  width: 64px; height: 64px; padding: 0; border-radius: 50%; border: 2px solid var(--ink); background: transparent; color: var(--ink);
+  font-size: 38px; line-height: 1; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+  transition: border-color .2s, color .2s, background .2s;
+}
+.img_slot_thumb .slot_plus { width: 40px; height: 40px; font-size: 24px; }
+.slot_plus:hover { border-color: var(--acc); color: var(--acc); background: rgba(var(--acc-rgb), .12); }
+.slot_label { font-size: 13px; color: var(--ink); }
+.slot_img { display: block; width: 100%; height: auto; }
+.slot_tools { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .2s; }
+.img_slot:hover .slot_tools, .img_slot:focus-within .slot_tools { opacity: 1; }
+.img_slot:not(.has-img) .slot_tools { position: static; opacity: 1; }
+.slot_tools button {
+  padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: inherit; color: #fff;
+  background: rgba(20, 20, 24, .82); border: 1px solid rgba(255, 255, 255, .3); border-radius: 3px;
+}
+.img_slot:not(.has-img) .slot_tools button { color: var(--ink); background: transparent; border-color: var(--line); }
+.slot_tools button:hover { border-color: var(--acc); }
+@media (hover: none) { .slot_tools { opacity: 1; } }
+.img_slot.is-noimg { min-height: 150px; border: 1px dashed var(--danger); }
+.img_slot.is-noimg::before {
+  content: "이미지를 불러오지 못했습니다."; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--danger); font-size: 12px; pointer-events: none;
+}
+
+/* 레이아웃 조절선 (붉은 선) — 관리자 편집 모드에서만 DOM 에 생성됨 */
+.lay-handle { touch-action: none; }
+.lay-v { position: absolute; z-index: 15; top: 0; bottom: 0; left: calc(var(--split, 46%) + 12px - 5px); width: 10px; cursor: col-resize; }
+.lay-v::before { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; background: #ff3b3b; opacity: .85; }
+.lay-h { position: relative; height: 12px; margin: 8px 0; cursor: row-resize; }
+.lay-h::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 2px; background: #ff3b3b; opacity: .85; }
+.lay-handle:hover::before, .lay-handle.drag::before { opacity: 1; box-shadow: 0 0 6px rgba(255, 59, 59, .8); }
+.lay-label {
+  position: absolute; z-index: 1; padding: 1px 6px; font-size: 11px; line-height: 1.5; color: #ff3b3b; white-space: nowrap; pointer-events: none;
+  background: rgb(var(--win-rgb)); border-radius: 3px;
+}
+.lay-v .lay-label { top: 6px; left: 12px; }
+.lay-h .lay-label { top: -8px; right: 0; }
