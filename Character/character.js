@@ -9,6 +9,31 @@
     const TABLE = 'characters';
     const PER_PAGE = 12;
 
+    // 네이버 블로그처럼 고를 수 있는 인용구 / 구분선 모양 (CSS 는 character.css 의 .mz-quote / .mz-hr 와 짝)
+    const QUOTE_STYLES = [['marks', '따옴표'], ['bar', '버티컬 라인'], ['bubble', '말풍선'], ['line', '라인 & 따옴표'], ['note', '포스트잇'], ['frame', '프레임']];
+    const HR_STYLES = [['short', '짧은 선'], ['line', '실선'], ['dash', '점선'], ['dots', '점'], ['diamond', '마름모'], ['spark', '반짝이']];
+    const HR_MARK = { diamond: '◆', spark: '✦' };
+    const PH_TEXT = '내용을 입력하세요.', PH_SRC = '출처 입력';
+
+    function quoteHtml(k, text) {
+        const id = 'q' + Date.now();
+        const body = text ? esc(text).replace(/\n/g, '<br>') : PH_TEXT;
+        let h = '<blockquote class="mz-quote q-' + k + '" data-mzq="' + id + '"><div class="q-text' + (text ? '' : ' ph') + '" data-ph="' + PH_TEXT + '">' + body + '</div>';
+        if (k === 'bar') h += '<div class="q-src ph" data-ph="' + PH_SRC + '">' + PH_SRC + '</div>';
+        return { id: id, html: h + '</blockquote><div><br></div>' };
+    }
+    function hrHtml(k) {
+        return '<div class="mz-hr hr-' + k + '" contenteditable="false">' + (HR_MARK[k] ? '<span>' + HR_MARK[k] + '</span>' : '') + '</div><div><br></div>';
+    }
+    // 저장 직전: 안 고친 안내문구(내용을 입력하세요 등)와 선택 표시를 제거
+    function cleanEditorHtml(root) {
+        root.querySelectorAll('.mz-hr.sel').forEach(n => n.classList.remove('sel'));
+        root.querySelectorAll('.mz-quote').forEach(q => {
+            q.querySelectorAll('.ph').forEach(n => n.remove());
+            if (!q.textContent.trim()) q.remove();
+        });
+    }
+
     function formatContent(text) {
         if (!text) return '';
         return text;
@@ -21,6 +46,12 @@
         let loadError = '';
 
         MZ.fitStage();
+
+        let formCleanup = null;   // 글쓰기 폼이 닫힐 때 문서 전체에 건 이벤트를 걷어내는 함수
+        document.addEventListener('mousedown', e => {
+            if (e.target.closest && e.target.closest('.tb-drop')) return;
+            document.querySelectorAll('.tb-drop.open').forEach(d => d.classList.remove('open'));
+        });
 
         const SQL_HELP =
 `create table characters (
@@ -54,6 +85,7 @@ alter table characters disable row level security;`;
             const r = parseRoute();
             // body에 붙어 있는 표 크기 조절 핸들이 화면 이동 후에도 남지 않도록 정리
             document.querySelectorAll('.table-resize-box').forEach(el => el.remove());
+            if (formCleanup) { formCleanup(); formCleanup = null; }
             if (!loaded) { renderLoadError(); return; }
             if ((r.name === 'write' || r.name === 'edit') && !isAdmin) { go('#/'); return; }
             if (r.name === 'view') renderView(r.a);
@@ -233,6 +265,11 @@ alter table characters disable row level security;`;
                 '<button type="button" data-cmd="justifyLeft" title="왼쪽 정렬">좌정렬</button>' +
                 '<button type="button" data-cmd="justifyCenter" title="가운데 정렬">중앙정렬</button>' +
                 '<button type="button" data-cmd="justifyRight" title="오른쪽 정렬">우정렬</button>' +
+                '<span class="tb-sep"></span>' +
+                '<div class="tb-drop" data-drop="quote"><button type="button" class="tb-drop-btn" title="인용구">❝ 인용구 ▾</button>' +
+                '<div class="tb-menu">' + QUOTE_STYLES.map(s => '<button type="button" class="tb-item" data-quote="' + s[0] + '" title="' + s[1] + '"><span class="mz-quote q-' + s[0] + '"><span class="q-text">내용을 입력하세요.</span>' + (s[0] === 'bar' ? '<span class="q-src">출처 입력</span>' : '') + '</span><em>' + s[1] + '</em></button>').join('') + '</div></div>' +
+                '<div class="tb-drop" data-drop="hr"><button type="button" class="tb-drop-btn" title="구분선">─ 구분선 ▾</button>' +
+                '<div class="tb-menu tb-menu-hr">' + HR_STYLES.map(s => '<button type="button" class="tb-item" data-hr="' + s[0] + '" title="' + s[1] + '"><span class="mz-hr hr-' + s[0] + '">' + (HR_MARK[s[0]] ? '<span>' + HR_MARK[s[0]] + '</span>' : '') + '</span><em>' + s[1] + '</em></button>').join('') + '</div></div>' +
                 '<span class="tb-sep"></span>' +
                 '<button type="button" id="edInsertTable" title="표 삽입">표 삽입</button>' +
                 // 표 설정은 글 설정 툴바의 두 번째 줄
@@ -426,6 +463,117 @@ alter table characters disable row level security;`;
                 });
             });
 
+            // ───────── 인용구 / 구분선 ─────────
+            const toolbarEl = document.querySelector('.editor-toolbar');
+            let savedRange = null;
+            const onSelChange = () => {
+                const s = window.getSelection();
+                if (s.rangeCount && contentEditableDiv.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+            };
+            document.addEventListener('selectionchange', onSelChange);
+            formCleanup = () => document.removeEventListener('selectionchange', onSelChange);
+
+            // 메뉴를 눌러도 글 편집창의 커서가 풀리지 않게 함
+            toolbarEl.addEventListener('mousedown', e => { if (e.target.closest('.tb-drop')) e.preventDefault(); });
+            toolbarEl.querySelectorAll('.tb-drop-btn').forEach(b => b.addEventListener('click', e => {
+                e.preventDefault();
+                const d = b.closest('.tb-drop'), was = d.classList.contains('open');
+                toolbarEl.querySelectorAll('.tb-drop.open').forEach(x => x.classList.remove('open'));
+                if (!was) d.classList.add('open');
+            }));
+
+            function caretToEnd() {
+                const s = window.getSelection(), r = document.createRange();
+                r.selectNodeContents(contentEditableDiv); r.collapse(false);
+                s.removeAllRanges(); s.addRange(r);
+            }
+            function placeCaretIn(node, collapseStart) {
+                const s = window.getSelection(), r = document.createRange();
+                r.selectNodeContents(node); if (collapseStart !== undefined) r.collapse(collapseStart);
+                s.removeAllRanges(); s.addRange(r);
+            }
+            // 현재 커서 위치에 HTML 삽입 (인용구 안에서 누르면 인용구 바로 뒤에 넣음)
+            function insertBlock(html) {
+                contentEditableDiv.focus();
+                const s = window.getSelection();
+                if (savedRange && contentEditableDiv.contains(savedRange.startContainer)) { s.removeAllRanges(); s.addRange(savedRange); }
+                else if (!s.rangeCount || !contentEditableDiv.contains(s.anchorNode)) caretToEnd();
+                let n = s.anchorNode; if (n && n.nodeType === 3) n = n.parentElement;
+                const q = n && n.closest ? n.closest('.mz-quote') : null;
+                if (q && contentEditableDiv.contains(q)) {
+                    const r = document.createRange(); r.setStartAfter(q); r.collapse(true);
+                    s.removeAllRanges(); s.addRange(r);
+                }
+                document.execCommand('insertHTML', false, html);
+            }
+            toolbarEl.querySelectorAll('[data-quote]').forEach(b => b.addEventListener('click', e => {
+                e.preventDefault();
+                const s = window.getSelection();
+                const picked = (savedRange && !savedRange.collapsed && contentEditableDiv.contains(savedRange.startContainer)) ? savedRange.toString() : '';
+                const q = quoteHtml(b.getAttribute('data-quote'), picked.trim());
+                insertBlock(q.html);
+                const box = contentEditableDiv.querySelector('[data-mzq="' + q.id + '"]');
+                if (box) {
+                    box.removeAttribute('data-mzq');
+                    const t = box.querySelector('.q-text');
+                    placeCaretIn(t, undefined);     // 안내 문구를 선택해 두어 바로 타이핑하면 교체됨
+                    if (!t.classList.contains('ph')) s.collapseToEnd();
+                }
+                b.closest('.tb-drop').classList.remove('open');
+            }));
+            toolbarEl.querySelectorAll('[data-hr]').forEach(b => b.addEventListener('click', e => {
+                e.preventDefault();
+                insertBlock(hrHtml(b.getAttribute('data-hr')));
+                b.closest('.tb-drop').classList.remove('open');
+            }));
+
+            // 안내 문구는 글을 쓰기 시작하면 회색(안내) 표시를 뺌
+            contentEditableDiv.addEventListener('input', () => {
+                contentEditableDiv.querySelectorAll('.ph').forEach(n => { if (n.textContent.trim() !== n.getAttribute('data-ph')) n.classList.remove('ph'); });
+            });
+            // 구분선은 클릭해서 선택 → Delete/Backspace 로 삭제
+            let pickedHr = null;
+            const clearHr = () => { if (pickedHr) pickedHr.classList.remove('sel'); pickedHr = null; };
+            contentEditableDiv.addEventListener('click', e => {
+                const h = e.target.closest ? e.target.closest('.mz-hr') : null;
+                clearHr();
+                if (h && contentEditableDiv.contains(h)) { pickedHr = h; h.classList.add('sel'); }
+            });
+            contentEditableDiv.addEventListener('keydown', e => {
+                if (pickedHr && (e.key === 'Delete' || e.key === 'Backspace')) {
+                    e.preventDefault();
+                    const nx = pickedHr.nextElementSibling; pickedHr.remove(); pickedHr = null;
+                    if (nx) placeCaretIn(nx, true);
+                    return;
+                }
+                if (e.key !== 'Enter' && e.key !== 'Backspace') return;
+                const s = window.getSelection();
+                if (!s.rangeCount || !s.isCollapsed) return;
+                let n = s.anchorNode; if (n && n.nodeType === 3) n = n.parentElement;
+                const q = n && n.closest ? n.closest('.mz-quote') : null;
+                if (!q || !contentEditableDiv.contains(q)) return;
+                let blk = n; while (blk && blk.parentElement !== q) blk = blk.parentElement;
+                if (!blk || blk.textContent.trim() !== '') return;
+                // 이 줄 아래에 아직 안 고친 안내 줄(출처 입력 등)만 남아 있으면 '마지막 줄'로 취급
+                let onlyPhAfter = true;
+                for (let t = blk.nextElementSibling; t; t = t.nextElementSibling) if (!t.classList.contains('ph')) onlyPhAfter = false;
+                if (e.key === 'Enter' && !e.shiftKey && onlyPhAfter) {
+                    // 빈 줄에서 Enter → 인용구를 빠져나와 아래 일반 글로
+                    e.preventDefault();
+                    if (q.children.length > 1) blk.remove();
+                    let nx = q.nextElementSibling;
+                    if (!nx || nx.classList.contains('mz-hr') || nx.classList.contains('mz-quote')) { nx = document.createElement('div'); nx.innerHTML = '<br>'; q.after(nx); }
+                    placeCaretIn(nx, true);
+                    if (!Array.from(q.children).some(c => !c.classList.contains('ph') && c.textContent.trim())) q.remove();
+                } else if (e.key === 'Backspace' && q.children.length === 1) {
+                    // 빈 인용구에서 Backspace → 인용구 삭제
+                    e.preventDefault();
+                    const nx = q.nextElementSibling || q.previousElementSibling;
+                    q.remove();
+                    if (nx) placeCaretIn(nx, true); else caretToEnd();
+                }
+            });
+
             // 일반 에디터 툴바 기능 연결
             document.querySelectorAll('.editor-toolbar button[data-cmd]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -559,6 +707,7 @@ alter table characters disable row level security;`;
                 const contentClone = contentEditableDiv.cloneNode(true);
                 const resizeUi = contentClone.querySelector('.table-resize-box');
                 if (resizeUi) resizeUi.remove();
+                cleanEditorHtml(contentClone);
                 const contentHtml = contentClone.innerHTML;
 
                 const row = {

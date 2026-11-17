@@ -256,3 +256,88 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 #tableFloatingMenu { order: 20; justify-content: flex-start; }
 .table-resize-box { position: fixed !important; transform: none !important; margin: 0 !important; }
 .table-resize-handle { touch-action: none; }
+
+/* =====================================================================
+   인용구 / 구분선 (글쓰기 툴바에서 삽입 · 보기 화면에서도 같은 모양)
+   ===================================================================== */
+/* 툴바 드롭다운 */
+.tb-drop { position: relative; display: inline-block; }
+.tb-menu {
+  display: none; position: absolute; left: 0; top: calc(100% + 4px); z-index: 60;
+  grid-template-columns: repeat(3, 1fr); gap: 6px; width: min(480px, 80vw); box-sizing: border-box; padding: 8px;
+  background: rgb(var(--win-rgb)); border: 1px solid var(--acc); border-radius: 6px; box-shadow: 0 10px 28px rgba(0,0,0,.5);
+}
+.tb-menu-hr { width: min(380px, 80vw); }
+.tb-drop.open .tb-menu { display: grid; }
+.editor-toolbar .tb-menu button.tb-item {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 6px; text-align: center;
+  padding: 8px 6px 6px; min-height: 84px; border: 1px solid var(--line-soft); border-radius: 4px; background: var(--card);
+  color: var(--ink); font-size: 12px; cursor: pointer; overflow: hidden;
+}
+.editor-toolbar .tb-menu button.tb-item:hover { background: rgba(var(--acc-rgb), .15); border-color: var(--acc); }
+.tb-item em { font-style: normal; font-size: 11px; color: var(--sub); }
+.tb-item .mz-quote { margin: 0 !important; padding: 10px 8px !important; font-size: 12px !important; }
+.tb-item .mz-quote.q-marks { padding: 4px 6px !important; }
+.tb-item .mz-quote.q-marks::before, .tb-item .mz-quote.q-marks::after { font-size: 22px; height: 12px; }
+.tb-item .mz-quote.q-bubble { margin-bottom: 8px !important; }
+.tb-item .mz-hr { margin: 14px auto !important; }
+.tb-item .mz-hr.hr-line, .tb-item .mz-hr.hr-dash { width: 80%; }
+
+/* ── 인용구 공통 ── */
+.mz-quote { display: block; margin: 26px 0; padding: 0; position: relative; box-sizing: border-box; line-height: 1.8; }
+.mz-quote .q-text, .mz-quote .q-src { display: block; min-height: 1.2em; }
+.mz-quote .q-src { margin-top: 6px; font-size: .8em; color: var(--sub); }
+.mz-quote .ph, .mz-hr .ph { color: var(--sub); }
+.mz-quote .q-text.ph { opacity: .75; }
+
+/* 1. 따옴표: 위·아래 큰 따옴표, 가운데 기울임 글 */
+.mz-quote.q-marks { text-align: center; font-style: italic; font-family: 'Nanum Myeongjo', serif; padding: 6px 24px; }
+.mz-quote.q-marks::before, .mz-quote.q-marks::after {
+  display: block; font-size: 44px; line-height: 1; height: 24px; color: var(--sub); font-style: italic; font-family: Georgia, 'Times New Roman', serif; opacity: .8;
+}
+.mz-quote.q-marks::before { content: "\201C"; margin-bottom: 6px; }
+.mz-quote.q-marks::after  { content: "\201D"; margin-top: 12px; }
+
+/* 2. 버티컬 라인: 왼쪽 굵은 선 + 출처 */
+.mz-quote.q-bar { border-left: 4px solid var(--ink); padding: 4px 0 4px 18px; text-align: left; }
+.mz-quote.q-bar .q-text { font-size: 1.1em; }
+
+/* 3. 말풍선 */
+.mz-quote.q-bubble {
+  padding: 14px 20px; border: 1px solid rgba(var(--acc-rgb), .55); border-radius: 10px; background: rgba(var(--acc-rgb), .06); margin-bottom: 34px;
+}
+.mz-quote.q-bubble::after {
+  content: ""; position: absolute; left: 26px; bottom: -16px; border: 8px solid transparent; border-top-color: rgba(var(--acc-rgb), .55);
+}
+
+/* 4. 라인 & 따옴표: 위아래 가는 선 + 작은 따옴표 */
+.mz-quote.q-line { text-align: center; padding: 18px 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.mz-quote.q-line::before { content: "\201C"; display: block; font-size: 26px; line-height: .8; color: var(--acc); font-family: Georgia, serif; }
+
+/* 5. 포스트잇 */
+.mz-quote.q-note {
+  padding: 18px 20px; background: #f7e88c; color: #2c2814; box-shadow: 2px 4px 10px rgba(0,0,0,.35); border-radius: 2px;
+}
+.mz-quote.q-note .q-src { color: #6b6335; }
+
+/* 6. 프레임: 좌상·우하 모서리 선 */
+.mz-quote.q-frame { padding: 22px 28px; text-align: center; }
+.mz-quote.q-frame::before, .mz-quote.q-frame::after { content: ""; position: absolute; width: 22px; height: 22px; border: 0 solid var(--acc); }
+.mz-quote.q-frame::before { left: 0; top: 0; border-top-width: 2px; border-left-width: 2px; }
+.mz-quote.q-frame::after  { right: 0; bottom: 0; border-bottom-width: 2px; border-right-width: 2px; }
+
+/* ── 구분선 ── */
+.mz-hr { display: block; margin: 30px auto; text-align: center; color: var(--sub); user-select: none; cursor: default; box-sizing: border-box; border-radius: 2px; }
+.mz-hr.sel { outline: 2px dashed var(--acc); outline-offset: 8px; }
+.mz-hr.hr-short { width: 64px; border-top: 3px solid var(--ink); }
+.mz-hr.hr-line { width: 100%; border-top: 1px solid rgba(var(--acc-rgb), .55); }
+.mz-hr.hr-dash { width: 100%; border-top: 1px dashed rgba(var(--acc-rgb), .7); }
+.mz-hr.hr-dots::before { content: "\2022  \2022  \2022  \2022  \2022"; font-size: 12px; letter-spacing: 8px; padding-left: 8px; color: var(--sub); white-space: nowrap; }
+.tb-item .mz-hr.hr-dots::before { letter-spacing: 3px; padding-left: 3px; }
+.mz-hr.hr-diamond, .mz-hr.hr-spark { display: flex; align-items: center; gap: 14px; width: 100%; color: var(--acc); }
+.mz-hr.hr-diamond::before, .mz-hr.hr-diamond::after,
+.mz-hr.hr-spark::before, .mz-hr.hr-spark::after { content: ""; flex: 1; border-top: 1px solid rgba(var(--acc-rgb), .55); }
+.mz-hr.hr-diamond > span { font-size: 12px; }
+.mz-hr.hr-spark > span { font-size: 18px; }
+/* 본문의 선택 가능한 첫 글자 높이 확보 */
+.mz-hr.hr-dots { height: 1.2em; line-height: 1.2em; }
