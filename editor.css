@@ -2,46 +2,106 @@
 /* 메인 페이지 블록 에디터 전용 스타일 (공통 창/네비게이션은 site.css) */
 
 /* 파워포인트 도형 클리핑 스타일 (메인 블록 + 이미지 편집 모달 미리보기 공용) */
-:is(.editable-element, #cropInnerBox).shape-rect { clip-path: none; }
-:is(.editable-element, #cropInnerBox).shape-oval { clip-path: ellipse(50% 50% at 50% 50%); }
-:is(.editable-element, #cropInnerBox).shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
-:is(.editable-element, #cropInnerBox).shape-rt-triangle { clip-path: polygon(0% 0%, 0% 100%, 100% 100%); }
-:is(.editable-element, #cropInnerBox).shape-parallelogram { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
-:is(.editable-element, #cropInnerBox).shape-trapezoid { clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%); }
-:is(.editable-element, #cropInnerBox).shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
-:is(.editable-element, #cropInnerBox).shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
-:is(.editable-element, #cropInnerBox).shape-hexagon { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-rect { clip-path: none; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-oval { clip-path: ellipse(50% 50% at 50% 50%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-rt-triangle { clip-path: polygon(0% 0%, 0% 100%, 100% 100%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-parallelogram { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-trapezoid { clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-pentagon { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-hexagon { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
 
-/* 이미지 블록 마우스 오버 전환 스타일
-   (벤토 #214 모션 값 이식: 스프링 곡선 .3,1.5,.5,1 / 칸이 살짝 뜨고 테두리가 밝아지며 / 안쪽 장면이 시차를 두고 움직임)
-   ※ 이미지에는 에디터가 인라인 transform(위치·확대)을 쓰므로,
-      호버 모션은 개별 속성 scale 로 얹어서 서로 덮어쓰지 않게 했습니다. */
+/* 액자 느낌의 모양 — 둥근 모서리 계열은 border-radius 로 만들어 테두리·그림자도 모양을 따라갑니다.
+   (큰 값은 CSS 규칙에 따라 칸 크기에 맞춰 자동으로 줄어듭니다: 999px = 반원/알약) */
+:is(.editable-element, #cropInnerBox, .flip-face).shape-round     { border-radius: 18px !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-pill      { border-radius: 999px !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-arch      { border-radius: 999px 999px 0 0 !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-arch-soft { border-radius: 999px 999px 14px 14px !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-leaf-a    { border-radius: 8px 90px 8px 90px !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-leaf-b    { border-radius: 90px 8px 90px 8px !important; }
+:is(.editable-element, #cropInnerBox, .flip-face).shape-corner    { border-radius: 8px 90px 8px 8px !important; }
+/* 모서리 깎기는 clip-path 라서 테두리선은 깎인 모서리에서 끊겨 보입니다 */
+:is(.editable-element, #cropInnerBox, .flip-face).shape-chamfer   { clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px); }
+
+/* 이미지 블록 마우스 오버: 블록 전체(테두리·배경·모양·프레임 포함)가 뒤집히며 두 번째 이미지가 나타남
+   구조: .editable-element(위치·회전·클릭 영역. 눈에는 안 보이는 틀)
+           > .flip-card(회전)
+               > .flip-front / .flip-back  (테두리·배경·모양 + 이미지)
+               > .flip-frame / .flip-frame-back  (프레임: 블록 바깥으로 튀어나오게 그림)
+   ※ 테두리·배경·모양은 editor.js 의 syncImageCard() 가 바깥 칸에서 각 면(.flip-face)으로 복사합니다.
+   ※ 이미지에는 에디터가 인라인 transform(위치·확대)을 쓰므로 이미지 안쪽 움직임은 개별 속성으로 얹습니다. */
 .editable-element img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
   pointer-events: none;
-  transition: opacity 0.35s ease, scale 0.5s cubic-bezier(.3, 1.5, .5, 1);
 }
-.editable-element .main-img {
-  scale: 1;
+.editable-element[data-type="image"] { perspective: 1000px; overflow: visible; }   /* 뒤집힐 때·프레임이 가장자리에서 잘리지 않게 */
+/* 바깥 칸은 투명한 틀: 모양(clip-path)·테두리·배경은 면이 그리므로 여기서는 끔 (프레임이 잘리지 않게) */
+#draggableGallery .editable-element[data-type="image"] {
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  clip-path: none !important;
+  box-shadow: none !important;
 }
-.editable-element .hover-img {
+#draggableGallery .editable-element[data-type="image"]::after { display: none !important; }
+.flip-card {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform var(--hv-flip, .8s) cubic-bezier(.4, 1.35, .5, 1);   /* 끝에서 살짝 튕기듯 안착 */
+}
+.flip-face {
+  position: absolute; inset: 0;
+  box-sizing: border-box;
+  overflow: hidden;                      /* 이미지 구도(이동·확대)는 면 안에서 잘림 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+/* 호버 시 밝아지는 테두리 (면 안쪽) */
+.flip-face::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  border-radius: inherit; opacity: 0;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--acc) 55%, transparent);
+  transition: opacity 0.3s ease;
+}
+.editable-element:hover .flip-face::after { opacity: var(--hv-ring); }
+.editable-element[data-p-frame] .flip-face::after { display: none; }   /* 프레임이 있으면 호버 테두리 대신 프레임 사용 */
+
+/* 프레임(장식 외곽선): editor.js 가 만든 SVG(--frame-img)를 블록 '바깥'으로 --frame-pad-x/y 만큼 내보내 그림 */
+.flip-frame {
+  display: none;
   position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  scale: var(--hv-zoom, 1.08);       /* 처음엔 살짝 크게 */
+  inset: calc(var(--frame-pad-y, 0px) * -1) calc(var(--frame-pad-x, 0px) * -1);
+  pointer-events: none;
+  background: var(--frame-img) center / 100% 100% no-repeat;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
-.editable-element:hover .hover-img {
-  opacity: 1;
-  scale: 1;                          /* 스프링으로 제 크기에 안착 */
-  transition-delay: 0.06s;           /* 메인 이미지보다 살짝 늦게 등장 */
+.editable-element[data-p-frame] .flip-frame { display: block; }
+
+/* 프레임 모양으로 이미지 자르기: editor.js 가 만든 마스크(--frame-mask)로 면(테두리·배경·이미지)을 잘라냄 */
+.editable-element[data-p-clip="1"] .flip-face {
+  -webkit-mask: var(--frame-mask) center / 100% 100% no-repeat;
+  mask: var(--frame-mask) center / 100% 100% no-repeat;
 }
-.editable-element:hover .main-img {
-  opacity: 0;
-  scale: var(--hv-shrink, .96);      /* 메인은 살짝 물러나며 사라짐 */
+
+.flip-back, .flip-frame-back { transform: rotateY(180deg); }
+.editable-element:hover .flip-card { transform: rotateY(180deg); }
+/* 위아래로 뒤집기 (관리자 패널에서 선택) */
+.editable-element[data-p-flip="x"] .flip-back,
+.editable-element[data-p-flip="x"] .flip-frame-back { transform: rotateX(180deg); }
+.editable-element[data-p-flip="x"]:hover .flip-card { transform: rotateX(180deg); }
+
+/* 글 블록의 프레임: 같은 방식으로 블록 바깥에 덮어 그림 (모양을 자르기로 바꾼 글 블록은 프레임도 같이 잘립니다) */
+.editable-element[data-p-frame]:not([data-type="image"]) { overflow: visible; }
+.editable-element[data-p-frame]:not([data-type="image"])::after {
+  display: block !important; opacity: 1 !important;
+  inset: calc(var(--frame-pad-y, 0px) * -1) calc(var(--frame-pad-x, 0px) * -1);
+  box-shadow: none; border-radius: 0;
+  background: var(--frame-img) center / 100% 100% no-repeat;
 }
 
 /* 블록 공통 */
@@ -91,15 +151,17 @@
 }
 
 /* 마우스 오버 애니메이션 강도 (관리자 패널의 0~3 설정과 연결) */
-.editable-element[data-anim-intensity="0"] { --hv-lift: 0px;   --hv-grow: 1;    --hv-zoom: 1;    --hv-shrink: 1;   --hv-glow: none; --hv-ring: 0; }
-.editable-element[data-anim-intensity="1"] { --hv-lift: -2px;  --hv-grow: 1;    --hv-zoom: 1.04; --hv-shrink: .98; --hv-glow: 0 4px 12px rgba(var(--acc-rgb),0.15); }
-.editable-element[data-anim-intensity="2"] { --hv-lift: -5px;  --hv-grow: 1;    --hv-zoom: 1.08; --hv-shrink: .96; --hv-glow: 0 8px 25px rgba(var(--acc-rgb),0.25); }
-.editable-element[data-anim-intensity="3"] { --hv-lift: -10px; --hv-grow: 1.02; --hv-zoom: 1.14; --hv-shrink: .93; --hv-glow: 0 12px 35px rgba(var(--acc-rgb),0.35); }
+.editable-element[data-anim-intensity="0"] { --hv-lift: 0px;   --hv-grow: 1;    --hv-zoom: 1;    --hv-shrink: 1;   --hv-glow: 0 0 0 0 transparent; --hv-ring: 0; --hv-flip: 0s; }
+.editable-element[data-anim-intensity="1"] { --hv-lift: -2px;  --hv-grow: 1;    --hv-zoom: 1.04; --hv-shrink: .98; --hv-glow: 0 4px 12px rgba(var(--acc-rgb),0.15); --hv-flip: .6s; }
+.editable-element[data-anim-intensity="2"] { --hv-lift: -5px;  --hv-grow: 1;    --hv-zoom: 1.08; --hv-shrink: .96; --hv-glow: 0 8px 25px rgba(var(--acc-rgb),0.25); --hv-flip: .8s; }
+.editable-element[data-anim-intensity="3"] { --hv-lift: -10px; --hv-grow: 1.02; --hv-zoom: 1.14; --hv-shrink: .93; --hv-glow: 0 12px 35px rgba(var(--acc-rgb),0.35); --hv-flip: 1s; }
 
 /* 모션 줄이기 설정: 전환은 즉시 끝나고 호버 최종 상태(이미지 교체)는 그대로 동작 */
 @media (prefers-reduced-motion: reduce) {
   .editable-element,
   .editable-element img,
+  .flip-card,
+  .flip-face::after,
   .editable-element::after { transition: none !important; }
   .editable-element:hover { translate: none; scale: none; }
 }
@@ -164,6 +226,8 @@ body:not(.is-admin) #draggableGallery .editable-element[data-type="shape"]:not([
 :root[data-theme="light"] .editable-element[style*="color: rgb(201, 168, 106)"] { color: var(--acc) !important; }
 :root[data-theme="light"] .editable-element[style*="201, 168, 106"] { border-color: rgba(var(--acc-rgb), .45) !important; }
 :root[data-theme="light"] .editable-element[style*="background-color: rgba(201, 168, 106"] { background-color: rgba(var(--acc-rgb), .08) !important; }
+:root[data-theme="light"] .flip-face[style*="201, 168, 106"] { border-color: rgba(var(--acc-rgb), .45) !important; }
+:root[data-theme="light"] .flip-face[style*="background-color: rgba(201, 168, 106"] { background-color: rgba(var(--acc-rgb), .08) !important; }
 :root[data-theme="light"] .cal-schedule-bar { background: rgba(var(--acc-rgb), .15) !important; border-color: rgba(var(--acc-rgb), .35) !important; }
 
 /* 관리자 패널: .panel-group 밖에 놓인 숫자·글자 입력칸(RGB 입력 등)도 같은 모양으로 */
