@@ -346,3 +346,20 @@ body { font-family: 'Nanum Myeongjo', serif; color: var(--ink); }
 .f_inputrow { display: flex; gap: 6px; align-items: stretch; }
 .f_inputrow input[type=text] { flex: 1 1 auto; min-width: 0; }
 .f_inputrow .btn { flex: none; white-space: nowrap; }
+
+
+/* v7: 표 선 종류·색 설정, 선 끌어서 행/열 크기 조절 */
+.editor-content-editable td, .editor-content-editable th, .char_content td, .char_content th { box-sizing: border-box; }
+.editor-content-editable td.mz-sel, .editor-content-editable th.mz-sel { outline: 2px solid rgba(var(--acc-rgb), .75); outline-offset: -2px; }
+#tableFloatingMenu .tbl-bd-label { font-size: 11px; color: var(--ink); }
+#tableFloatingMenu select { font-size: 11px; padding: 3px 6px; }
+#tableFloatingMenu input[type=color] { width: 22px; height: 20px; padding: 0; border: 1px solid var(--line-soft); background: none; cursor: pointer; }
+#tableFloatingMenu button.on { background: rgba(var(--acc-rgb), .35); border-color: var(--acc); }
+.table-line-layer { display: none; position: fixed; z-index: 29; pointer-events: none; margin: 0; }
+.table-line-handle { position: absolute; pointer-events: auto; touch-action: none; }
+.table-line-handle.tl-v { width: 9px; top: 8px; bottom: 8px; cursor: col-resize; }
+.table-line-handle.tl-h { height: 9px; left: 8px; right: 8px; cursor: row-resize; }
+.table-line-handle::after { content: ''; position: absolute; background: rgba(var(--acc-rgb), 0); transition: background .12s; }
+.table-line-handle.tl-v::after { left: 3px; right: 3px; top: 0; bottom: 0; }
+.table-line-handle.tl-h::after { top: 3px; bottom: 3px; left: 0; right: 0; }
+.table-line-handle:hover::after, .table-line-handle.drag::after { background: rgba(var(--acc-rgb), .85); }

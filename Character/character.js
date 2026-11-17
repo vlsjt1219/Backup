@@ -28,6 +28,7 @@
     // 저장 직전: 안 고친 안내문구(내용을 입력하세요 등)와 선택 표시를 제거
     function cleanEditorHtml(root) {
         root.querySelectorAll('.mz-hr.sel').forEach(n => n.classList.remove('sel'));
+        root.querySelectorAll('.mz-sel').forEach(n => { n.classList.remove('mz-sel'); if (!n.getAttribute('class')) n.removeAttribute('class'); });
         root.querySelectorAll('.mz-quote').forEach(q => {
             q.querySelectorAll('.ph').forEach(n => n.remove());
             if (!q.textContent.trim()) q.remove();
@@ -89,7 +90,7 @@ alter table characters disable row level security;`;
         function render() {
             const r = parseRoute();
             // body에 붙어 있는 표 크기 조절 핸들이 화면 이동 후에도 남지 않도록 정리
-            document.querySelectorAll('.table-resize-box').forEach(el => el.remove());
+            document.querySelectorAll('.table-resize-box, .table-line-layer').forEach(el => el.remove());
             if (formCleanup) { formCleanup(); formCleanup = null; }
             if (!loaded) { renderLoadError(); return; }
             if ((r.name === 'write' || r.name === 'edit') && !isAdmin) { go('#/'); return; }
@@ -292,6 +293,13 @@ alter table characters disable row level security;`;
                 '<button type="button" data-tbl-cmd="delRow">행 삭제</button>' +
                 '<button type="button" data-tbl-cmd="delCol">열 삭제</button>' +
                 '<button type="button" data-tbl-cmd="delTable" style="color:var(--danger);">표 삭제</button>' +
+                '<span style="width:1px;height:12px;background:var(--line-soft);display:inline-block;"></span>' +
+                '<span class="tbl-bd-label">선</span>' +
+                '<select id="tblBorderStyle" title="선 종류"><option value="solid">실선</option><option value="dashed">점선</option><option value="dotted">점(도트)</option></select>' +
+                '<input type="color" id="tblBorderColor" value="#888888" title="선 색상">' +
+                '<button type="button" id="tblBorderTransparent" title="선을 투명하게 (눌러서 켜기/끄기)" aria-pressed="false">투명</button>' +
+                '<button type="button" data-tbl-border="cells" title="선택한 칸(드래그로 여러 칸 선택 가능)의 선에만 적용">선택 칸 적용</button>' +
+                '<button type="button" data-tbl-border="table" title="표 전체 선에 적용">표 전체 적용</button>' +
                 '</div>' +
                 '</div>' +
                 '<div id="fContent" class="editor-content-editable" contenteditable="true">' + (v.content || '') + '</div>' +
@@ -312,9 +320,15 @@ alter table characters disable row level security;`;
                 .map(pos => '<span class="table-resize-handle ' + pos + '" data-resize="' + pos + '"></span>').join('');
             document.body.appendChild(tableResizeBox);
 
+            // 표 안쪽 선(행/열 경계)을 끌어서 크기를 조절하는 핸들 레이어
+            const tableLineLayer = document.createElement('div');
+            tableLineLayer.className = 'table-line-layer';
+            document.body.appendChild(tableLineLayer);
+
             function positionTableTools() {
                 if (!activeTable || !contentEditableDiv.contains(activeTable)) {
                     tableResizeBox.style.display = 'none';
+                    tableLineLayer.style.display = 'none';
                     tableFloatingMenu.style.display = 'none';
                     return;
                 }
@@ -326,6 +340,7 @@ alter table characters disable row level security;`;
                 tableResizeBox.style.width = Math.round(tr.width) + 'px';
                 tableResizeBox.style.height = Math.round(tr.height) + 'px';
                 tableFloatingMenu.style.display = 'flex';
+                layoutLineHandles();
             }
 
             function selectTable(table, cell) {
@@ -342,10 +357,13 @@ alter table characters disable row level security;`;
                     activeTable = null;
                     activeCell = null;
                     tableResizeBox.style.display = 'none';
+                    tableLineLayer.style.display = 'none';
                     tableFloatingMenu.style.display = 'none';
+                    clearCellMarks();
                 }
             });
             contentEditableDiv.addEventListener('scroll', positionTableTools);
+            window.addEventListener('scroll', positionTableTools, true);
             // 표가 지워지거나(되돌리기/Backspace 등) 내용이 바뀌면 핸들도 함께 갱신·제거
             contentEditableDiv.addEventListener('input', positionTableTools);
             window.addEventListener('resize', positionTableTools);
@@ -401,6 +419,178 @@ alter table characters disable row level security;`;
                 });
             });
 
+
+            // ───────── 표 선(테두리) 종류·색 / 선 끌어서 크기 조절 ─────────
+            let selCells = [];   // 선 적용 대상(커서가 있거나 드래그로 선택한 칸)
+
+            function clearCellMarks() {
+                contentEditableDiv.querySelectorAll('.mz-sel').forEach(n => { n.classList.remove('mz-sel'); if (!n.getAttribute('class')) n.removeAttribute('class'); });
+                selCells = [];
+            }
+            function cellsFromSelection() {
+                const s = window.getSelection();
+                if (!s || !s.rangeCount) return null;
+                let n = s.anchorNode;
+                if (n && n.nodeType === Node.TEXT_NODE) n = n.parentElement;
+                const aCell = n && n.closest ? n.closest('td, th') : null;
+                if (!aCell || !contentEditableDiv.contains(aCell)) return null;
+                const table = aCell.closest('table');
+                if (!s.isCollapsed) {
+                    const range = s.getRangeAt(0);
+                    const hit = Array.from(table.querySelectorAll('td, th')).filter(c => range.intersectsNode(c));
+                    if (hit.length) return { table: table, cells: hit };
+                }
+                return { table: table, cells: [aCell] };
+            }
+            function trackCellSelection() {
+                const info = cellsFromSelection();
+                if (!info) return;   // 색상/종류 칸을 눌러 포커스가 옮겨가도 마지막 선택을 유지
+                contentEditableDiv.querySelectorAll('.mz-sel').forEach(n => { if (info.cells.indexOf(n) < 0) { n.classList.remove('mz-sel'); if (!n.getAttribute('class')) n.removeAttribute('class'); } });
+                info.cells.forEach(c => c.classList.add('mz-sel'));
+                selCells = info.cells;
+                if (info.table !== activeTable) { activeTable = info.table; positionTableTools(); }
+                activeCell = info.cells[0];
+            }
+
+            const bdStyleSel = document.getElementById('tblBorderStyle');
+            const bdColorInput = document.getElementById('tblBorderColor');
+            const bdTransBtn = document.getElementById('tblBorderTransparent');
+            let bdTransparent = false;
+            function setTransparent(on) {
+                bdTransparent = on;
+                bdTransBtn.classList.toggle('on', on);
+                bdTransBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            }
+            bdTransBtn.addEventListener('click', e => { e.preventDefault(); setTransparent(!bdTransparent); });
+            bdColorInput.addEventListener('input', () => setTransparent(false));   // 색을 새로 고르면 투명 해제
+
+            function setEdge(cell, side, style, color) {
+                if (!cell) return;
+                const w = parseFloat(getComputedStyle(cell)['border' + side + 'Width']) || 0;
+                cell.style['border' + side] = (w > 0 ? w : 1) + 'px ' + style + ' ' + color;
+            }
+            // 칸의 네 변을 바꾸고, 맞닿은 이웃 칸의 같은 선도 함께 바꾼다
+            // (표는 선이 합쳐지는 방식이라 이웃 칸이 다르면 이웃의 선이 이겨서 안 바뀐 것처럼 보임)
+            function paintCell(table, cell, style, color) {
+                const tr = cell.parentElement, r = tr.rowIndex, c = cell.cellIndex;
+                ['Top', 'Right', 'Bottom', 'Left'].forEach(sd => setEdge(cell, sd, style, color));
+                const up = table.rows[r - 1] && table.rows[r - 1].cells[c];
+                const down = table.rows[r + 1] && table.rows[r + 1].cells[c];
+                setEdge(up, 'Bottom', style, color);
+                setEdge(down, 'Top', style, color);
+                setEdge(tr.cells[c - 1], 'Right', style, color);
+                setEdge(tr.cells[c + 1], 'Left', style, color);
+            }
+            function copyBorders(dst, src) {
+                if (!dst || !src) return;
+                ['Top', 'Right', 'Bottom', 'Left'].forEach(sd => { const v = src.style['border' + sd]; if (v) dst.style['border' + sd] = v; });
+            }
+            tableFloatingMenu.querySelectorAll('button[data-tbl-border]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.preventDefault();
+                    if (!activeTable || !contentEditableDiv.contains(activeTable)) return;
+                    const style = bdStyleSel.value || 'solid';
+                    const color = bdTransparent ? 'transparent' : bdColorInput.value;
+                    let targets;
+                    if (btn.getAttribute('data-tbl-border') === 'table') {
+                        targets = Array.from(activeTable.querySelectorAll('td, th'));
+                    } else {
+                        targets = selCells.filter(c => activeTable.contains(c));
+                        if (!targets.length && activeCell) targets = [activeCell];
+                        if (!targets.length) { alert('선을 바꿀 칸을 먼저 클릭하거나 드래그해서 선택해 주세요.'); return; }
+                    }
+                    targets.forEach(c => paintCell(activeTable, c, style, color));
+                    requestAnimationFrame(positionTableTools);
+                });
+            });
+
+            // 열 폭(%)을 첫 줄 칸에 저장 → 보기 화면에서도 같은 비율로 보임
+            function applyColWidths(table, widths) {
+                const total = widths.reduce((a, b) => a + b, 0) || 1;
+                table.style.tableLayout = 'fixed';
+                Array.from(table.rows[0].cells).forEach((c, i) => {
+                    if (widths[i] != null) c.style.width = (widths[i] / total * 100).toFixed(2) + '%';
+                });
+            }
+
+            function syncHandles(kind, n) {
+                const list = tableLineLayer.querySelectorAll('.tl-' + kind);
+                for (let i = list.length; i < n; i++) {
+                    const d = document.createElement('div');
+                    d.className = 'table-line-handle tl-' + kind;
+                    tableLineLayer.appendChild(d);
+                }
+                for (let i = list.length - 1; i >= n; i--) list[i].remove();
+            }
+            function layoutLineHandles() {
+                const t = activeTable;
+                if (!t || !contentEditableDiv.contains(t) || !t.rows.length) { tableLineLayer.style.display = 'none'; return; }
+                const tr = t.getBoundingClientRect();
+                tableLineLayer.style.display = 'block';
+                tableLineLayer.style.left = Math.round(tr.left) + 'px';
+                tableLineLayer.style.top = Math.round(tr.top) + 'px';
+                tableLineLayer.style.width = Math.round(tr.width) + 'px';
+                tableLineLayer.style.height = Math.round(tr.height) + 'px';
+                const row0 = t.rows[0];
+                syncHandles('v', Math.max(0, row0.cells.length - 1));
+                syncHandles('h', Math.max(0, t.rows.length - 1));
+                tableLineLayer.querySelectorAll('.tl-v').forEach((h, i) => {
+                    h.style.left = Math.round(row0.cells[i].getBoundingClientRect().right - tr.left - 4) + 'px';
+                });
+                tableLineLayer.querySelectorAll('.tl-h').forEach((h, j) => {
+                    h.style.top = Math.round(t.rows[j].getBoundingClientRect().bottom - tr.top - 4) + 'px';
+                });
+            }
+
+            // 선 끌기: 세로선 → 왼쪽/오른쪽 열 폭, 가로선 → 위쪽 행 높이
+            tableLineLayer.addEventListener('pointerdown', (e) => {
+                const h = e.target.closest('.table-line-handle');
+                if (!h || !activeTable || !contentEditableDiv.contains(activeTable)) return;
+                e.preventDefault(); e.stopPropagation();
+                const table = activeTable;
+                const isV = h.classList.contains('tl-v');
+                const idx = Array.from(tableLineLayer.querySelectorAll(isV ? '.tl-v' : '.tl-h')).indexOf(h);
+                const rect = table.getBoundingClientRect();
+                const scaleX = (table.offsetWidth && rect.width) ? rect.width / table.offsetWidth : 1;   // 확대/축소 보정
+                const scaleY = (table.offsetHeight && rect.height) ? rect.height / table.offsetHeight : 1;
+                const startX = e.clientX, startY = e.clientY;
+                let widths = null, heights = null;
+                if (isV) {
+                    widths = Array.from(table.rows[0].cells).map(c => c.getBoundingClientRect().width / scaleX);
+                    if (idx < 0 || idx + 1 >= widths.length) return;
+                } else {
+                    heights = Array.from(table.rows).map(r => r.getBoundingClientRect().height / scaleY);
+                    // 표 전체 높이를 직접 지정해 둔 경우 행 높이가 안 먹으므로 현재 높이를 각 행에 고정
+                    table.style.removeProperty('height');
+                    Array.from(table.rows).forEach((r, i) => { r.style.height = Math.round(heights[i]) + 'px'; });
+                    if (idx < 0 || idx >= heights.length) return;
+                }
+                h.classList.add('drag');
+                const MINW = 30, MINH = 24;
+                const move = ev => {
+                    if (isV) {
+                        let dx = (ev.clientX - startX) / scaleX;
+                        dx = Math.max(MINW - widths[idx], Math.min(widths[idx + 1] - MINW, dx));
+                        const nw = widths.slice(); nw[idx] += dx; nw[idx + 1] -= dx;
+                        applyColWidths(table, nw);
+                    } else {
+                        const dy = Math.max(MINH - heights[idx], (ev.clientY - startY) / scaleY);
+                        table.rows[idx].style.height = Math.round(heights[idx] + dy) + 'px';
+                    }
+                    positionTableTools();
+                };
+                const finish = () => {
+                    window.removeEventListener('pointermove', move);
+                    window.removeEventListener('pointerup', finish);
+                    window.removeEventListener('pointercancel', finish);
+                    h.classList.remove('drag');
+                    requestAnimationFrame(positionTableTools);
+                };
+                window.addEventListener('pointermove', move);
+                window.addEventListener('pointerup', finish, { once: true });
+                window.addEventListener('pointercancel', finish, { once: true });
+            });
+
             // 표 플로팅 툴바 기능 처리
             tableFloatingMenu.querySelectorAll('button[data-tbl-cmd]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -428,16 +618,27 @@ alter table characters disable row level security;`;
                                 newCell.style.padding = '8px';
                                 newCell.style.minWidth = '30px';
                                 newCell.innerHTML = '<br>';
+                                copyBorders(newCell, row.cells[i]);
                             }
                         } else if (cmd === 'addColLeft' || cmd === 'addColRight') {
                             const targetColIdx = cmd === 'addColLeft' ? cellIndex : cellIndex + 1;
+                            // 열 폭을 직접 조절해 둔 표라면 새 열에도 평균 폭을 주고 비율을 다시 맞춘다
+                            const hadWidths = Array.from(activeTable.rows[0].cells).some(c => c.style.width);
+                            const oldWidths = hadWidths ? Array.from(activeTable.rows[0].cells).map(c => c.getBoundingClientRect().width) : null;
                             for (let i = 0; i < activeTable.rows.length; i++) {
                                 const r = activeTable.rows[i];
+                                const src = r.cells[Math.min(cellIndex, r.cells.length - 1)];
                                 const newCell = r.insertCell(targetColIdx);
                                 newCell.style.border = '1px solid var(--line)';
                                 newCell.style.padding = '8px';
                                 newCell.style.minWidth = '30px';
                                 newCell.innerHTML = '<br>';
+                                copyBorders(newCell, src);
+                            }
+                            if (oldWidths) {
+                                const avg = oldWidths.reduce((a, b) => a + b, 0) / oldWidths.length;
+                                oldWidths.splice(targetColIdx, 0, avg);
+                                applyColWidths(activeTable, oldWidths);
                             }
                         } else if (cmd === 'delRow') {
                             if (activeTable.rows.length > 1) {
@@ -447,9 +648,12 @@ alter table characters disable row level security;`;
                             }
                         } else if (cmd === 'delCol') {
                             if (row.cells.length > 1) {
+                                const hadWidths = Array.from(activeTable.rows[0].cells).some(c => c.style.width);
+                                const oldWidths = hadWidths ? Array.from(activeTable.rows[0].cells).map(c => c.getBoundingClientRect().width) : null;
                                 for (let i = 0; i < activeTable.rows.length; i++) {
                                     activeTable.rows[i].deleteCell(cellIndex);
                                 }
+                                if (oldWidths) { oldWidths.splice(cellIndex, 1); applyColWidths(activeTable, oldWidths); }
                             } else {
                                 alert('마지막 열은 삭제할 수 없습니다.');
                             }
@@ -461,8 +665,10 @@ alter table characters disable row level security;`;
                             activeTable.remove();
                             tableFloatingMenu.style.display = 'none';
                             tableResizeBox.style.display = 'none';
+                            tableLineLayer.style.display = 'none';
                             activeTable = null;
                             activeCell = null;
+                            clearCellMarks();
                         }
                     }
                     if (activeTable && cmd !== 'delTable') requestAnimationFrame(positionTableTools);
@@ -477,7 +683,12 @@ alter table characters disable row level security;`;
                 if (s.rangeCount && contentEditableDiv.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
             };
             document.addEventListener('selectionchange', onSelChange);
-            formCleanup = () => document.removeEventListener('selectionchange', onSelChange);
+            document.addEventListener('selectionchange', trackCellSelection);
+            formCleanup = () => {
+                document.removeEventListener('selectionchange', onSelChange);
+                document.removeEventListener('selectionchange', trackCellSelection);
+                window.removeEventListener('scroll', positionTableTools, true);
+            };
 
             // 메뉴를 눌러도 글 편집창의 커서가 풀리지 않게 함
             toolbarEl.addEventListener('mousedown', e => { if (e.target.closest('.tb-drop')) e.preventDefault(); });
@@ -672,6 +883,7 @@ alter table characters disable row level security;`;
                         td.style.border = '1px solid var(--line)';
                         td.style.padding = '8px';
                         td.style.minWidth = '30px';
+                        if (lastRow && lastRow.cells[i]) copyBorders(td, lastRow.cells[i]);
                     }
                     target = newRow.cells[0];
                 }
